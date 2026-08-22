@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "",
+    "DB_SERVER": "ppm-sql-dev-ags.database.windows.net",
+    "DB_DATABASE": "PPM_DEV",
+    "DB_USER": "",
+    "DB_PASSWORD": "",
+    "DB_PORT": "1433"
+  }
+}

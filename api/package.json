@@ -1,0 +1,14 @@
+{
+  "name": "ppm-connectivity-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions API for the PPM connectivity proof-of-concept (DEV only)",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0",
+    "mssql": "^11.0.1"
+  }
+}
