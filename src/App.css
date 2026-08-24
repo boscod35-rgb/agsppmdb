@@ -266,3 +266,34 @@ button:hover:not(:disabled) { background: #1d4ed8; }
   .sidebar-item { white-space: nowrap; width: auto; }
   .cards { grid-template-columns: 1fr; }
 }
+
+/* ---------- Project Workspace shell (Chunk 03) ---------- */
+
+.workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 20px 0 0;
+  border-bottom: 1px solid #e2e2e2;
+}
+
+.workspace-tab {
+  background: none;
+  color: #555;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.workspace-tab:hover:not(:disabled) { background: #f4f5f7; }
+
+.workspace-tab.active {
+  color: #1b2a4a;
+  font-weight: 600;
+  border-bottom-color: #b8860b;
+}
+
+.placeholder-box { margin-top: 0; border-top: none; border-top-left-radius: 0; border-top-right-radius: 0; }
