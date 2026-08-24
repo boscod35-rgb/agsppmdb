@@ -32,7 +32,7 @@ original file. (framework Section 92)
 |---|---|---|---|
 | 001 | `001_initial_schema.sql` | DEV, TEST | 15 schemas + `system.SchemaVersions` + `system.AuditLog` |
 | 002 | `002_cmdb.sql` | DEV, TEST | `cmdb` schema + `cmdb.AzureResources` + seed data |
-| 003 | `003_config_engine.sql` | **Not yet applied** | `cfg.ConfigCategories` + `cfg.ConfigValues` + seed data (Configuration Engine core, Module 05) |
+| 003 | `003_config_engine.sql` | DEV, TEST | `cfg.ConfigCategories` + `cfg.ConfigValues` + seed data (Configuration Engine core, Module 05) |
 
 Every database independently tracks which migrations it has via its
 own `system.SchemaVersions` table — DEV and TEST each have their own
@@ -148,8 +148,8 @@ Numbering Rules (Module 06), and Lifecycle/Stage-Gate (Module 07)
 are deliberately not modeled as `cfg.ConfigValues` rows — each needs
 its own structure and gets its own future migration.
 
-**Not yet applied to DEV or TEST** — migration 003 is code-complete
-but has not been run through the Azure Portal Query Editor yet.
+**Applied to DEV and TEST**, verified via the migration's built-in
+check query (7 categories, correct value counts on both).
 
 ## Credentials reference (usernames and env var names ONLY — no
 ## passwords appear in this file or anywhere in the repo)

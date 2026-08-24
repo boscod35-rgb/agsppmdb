@@ -11,6 +11,40 @@ current chunk numbering.
 
 ---
 
+## v0.5.0 — Configuration Engine (Module 05) — deployed
+
+**Added**
+- `cfg.ConfigCategories`, `cfg.ConfigValues` tables (migration
+  `003_config_engine.sql`)
+- Seed data: 7 categories (Project Type, Category, Size, Complexity,
+  Priority, Status, Health Status), each with 3–5 starter values
+- `GET /api/config/categories`, `GET /api/config/values` endpoints
+- `src/pages/ConfigurationPage.jsx` — read-only picklist viewer
+  under Administration -> Project Configuration
+- `src/App.jsx` — Project Configuration entry flipped from
+  placeholder to `built: true`
+
+**Database**
+- Migration `003_config_engine.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+**QA**
+- Verification query confirmed 7 categories with correct value
+  counts (4/4/4/4/4/5/3) on both DEV and TEST
+- Administration -> Project Configuration renders correctly on both
+  environments, all 7 category filter chips functional
+
+**Known Issues**
+- One migration run required a re-attempt after a partial paste
+  only created the `cfg` schema without its tables — resolved by
+  re-running the complete file (idempotent, no cleanup needed)
+- Azure Static Web Apps CDN lag caused the DEV deployment to
+  temporarily appear unchanged for several minutes after a
+  successful build — resolved by waiting, not a code issue
+
+---
+
 ## v0.4.0 — Application Shell
 
 **Added**

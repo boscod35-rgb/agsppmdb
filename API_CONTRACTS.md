@@ -113,9 +113,7 @@ category:
 ## GET /api/config/categories
 
 Returns the Configuration Engine's picklist categories (Module 05).
-Read-only. **Built, not yet deployed** — migration 003 has not been
-run on DEV or TEST yet, so this endpoint will return `SCHEMA_MISSING`
-until it is.
+Read-only. Deployed and verified on DEV and TEST.
 
 **Success (200):**
 ```json
