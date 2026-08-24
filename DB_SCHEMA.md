@@ -33,6 +33,7 @@ original file. (framework Section 92)
 | 001 | `001_initial_schema.sql` | DEV, TEST | 15 schemas + `system.SchemaVersions` + `system.AuditLog` |
 | 002 | `002_cmdb.sql` | DEV, TEST | `cmdb` schema + `cmdb.AzureResources` + seed data |
 | 003 | `003_config_engine.sql` | DEV, TEST | `cfg.ConfigCategories` + `cfg.ConfigValues` + seed data (Configuration Engine core, Module 05) |
+| 004 | `004_config_crud.sql` | DEV, TEST | `UpdatedDate` + `UpdatedBy` columns on `cfg.ConfigValues` (Configuration Engine CRUD) |
 
 Every database independently tracks which migrations it has via its
 own `system.SchemaVersions` table — DEV and TEST each have their own
@@ -137,6 +138,8 @@ IsDefault                           BIT DEFAULT 0
 Notes                                 NVARCHAR(500) NULL
 CreatedDate                             DATETIME2 DEFAULT SYSUTCDATETIME()
 CreatedBy                                 NVARCHAR(200) DEFAULT SUSER_SNAME()
+UpdatedDate                                 DATETIME2 NULL   -- added in migration 004
+UpdatedBy                                     NVARCHAR(200) NULL   -- added in migration 004
 UNIQUE (CategoryId, ValueCode)
 ```
 
@@ -150,6 +153,11 @@ its own structure and gets its own future migration.
 
 **Applied to DEV and TEST**, verified via the migration's built-in
 check query (7 categories, correct value counts on both).
+
+Full CRUD is live via `/api/config/values` (see `API_CONTRACTS.md`):
+create, update, and deactivate (soft-delete — `IsActive = 0`, never
+a hard `DELETE`) are all supported and verified end-to-end on both
+environments (migration `004_config_crud.sql`).
 
 ## Credentials reference (usernames and env var names ONLY — no
 ## passwords appear in this file or anywhere in the repo)

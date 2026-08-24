@@ -11,6 +11,41 @@ current chunk numbering.
 
 ---
 
+## v0.6.0 — Configuration Engine CRUD
+
+**Added**
+- `UpdatedDate`, `UpdatedBy` columns on `cfg.ConfigValues` (migration
+  `004_config_crud.sql`)
+- `POST /api/config/values` — create
+- `PUT /api/config/values/{id}` — update
+- `DELETE /api/config/values/{id}` — soft-delete (`IsActive = 0`,
+  never a hard delete — history stays recoverable)
+- Setting a value as Default automatically un-defaults the previous
+  default in that category (enforced server-side, not just in the UI)
+- `src/pages/ConfigurationPage.jsx` — Add/Edit/Deactivate UI added
+  on top of the existing read-only table
+
+**Database**
+- Migration `004_config_crud.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+**QA**
+- Verified end-to-end on DEV: created a test value, confirmed it
+  appeared with correct fields, deactivated it, confirmed it showed
+  "Inactive" and lost its Deactivate button while remaining visible
+  (not deleted)
+- TEST confirmed showing the same Add/Edit/Deactivate controls and
+  behavior after promotion from `main` via `main` -> `test`
+
+**Decisions**
+- Chose GitHub's built-in branch-compare/merge (main -> test) over
+  building a GitHub Actions auto-sync workflow, since no automated
+  test suite exists yet to gate an automation on — see reasoning in
+  conversation; revisit once a real regression suite exists
+
+---
+
 ## v0.5.0 — Configuration Engine (Module 05) — deployed
 
 **Added**

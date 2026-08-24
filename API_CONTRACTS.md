@@ -144,7 +144,7 @@ Read-only. Deployed and verified on DEV and TEST.
 ## GET /api/config/values
 
 Returns the Configuration Engine's picklist values (Module 05).
-Read-only. Same deployment status as `/api/config/categories` above.
+Deployed and verified on DEV and TEST.
 
 **Query parameters:**
 
@@ -168,7 +168,11 @@ Read-only. Same deployment status as `/api/config/categories` above.
       "SortOrder": 10,
       "IsActive": true,
       "IsDefault": true,
-      "Notes": "Starter example - edit via Configuration UI once available."
+      "Notes": "Starter example - edit via Configuration UI once available.",
+      "CreatedDate": "2026-08-23T00:00:00.000Z",
+      "CreatedBy": "agsadmin",
+      "UpdatedDate": null,
+      "UpdatedBy": null
     }
   ]
 }
@@ -179,14 +183,80 @@ Read-only. Same deployment status as `/api/config/categories` above.
 
 ---
 
+## POST /api/config/values
+
+Creates a new value under an existing category. Admin-facing UI
+only for now (no auth exists yet — this is not publicly writable in
+spirit, just not yet gated).
+
+**Body:**
+```json
+{
+  "categoryCode": "ProjectType",
+  "valueCode": "PILOT",
+  "valueLabel": "Pilot",
+  "sortOrder": 50,
+  "isDefault": false,
+  "notes": "optional"
+}
+```
+`categoryCode`, `valueCode`, and `valueLabel` are required. Setting
+`isDefault: true` automatically clears the default flag on every
+other value in that category first — there is always at most one
+default per category.
+
+**Success (201):** `{ "success": true, "value": { ...the created row... } }`
+
+**Failure:**
+
+| Category | HTTP | Meaning |
+|---|---|---|
+| `VALIDATION_FAILED` | 400 | Missing a required field |
+| `NOT_FOUND` | 404 | `categoryCode` doesn't match an existing category |
+| `DUPLICATE_VALUE_CODE` | 500 | `valueCode` already exists in that category |
+
+---
+
+## PUT /api/config/values/{id}
+
+Updates an existing value. Any subset of fields may be sent —
+omitted fields keep their current value.
+
+**Body:**
+```json
+{ "valueLabel": "Pilot Program", "sortOrder": 45, "isDefault": true, "notes": "updated" }
+```
+
+Setting `isDefault: true` clears the default flag on every other
+value in the same category first. `UpdatedDate`/`UpdatedBy` are set
+automatically — never pass these in the request body.
+
+**Success (200):** `{ "success": true, "value": { ...the updated row... } }`
+
+**Failure:** `NOT_FOUND` (404) if `{id}` doesn't exist, otherwise
+same shape as POST.
+
+---
+
+## DELETE /api/config/values/{id}
+
+**Soft-delete only** — sets `IsActive = 0`. There is no hard-delete
+endpoint; deactivated values remain in the database and can still be
+viewed (just not selected for new use), consistent with the
+framework's Deactivate/Archive pattern (Section 95).
+
+**Success (200):** `{ "success": true, "message": "Config value 12 deactivated." }`
+
+**Failure:** `NOT_FOUND` (404) if `{id}` doesn't exist.
+
+---
+
 ## Planned, not yet built
 
 - `GET /api/cmdb/azure-resources/{id}` — single record
 - `POST /api/cmdb/azure-resources` — create (admin only, once auth exists)
 - `PUT /api/cmdb/azure-resources/{id}` — update (admin only)
 - `POST /api/cmdb/azure-resources/{id}/verify` — bump `LastVerifiedDate` only
-- `POST` / `PUT` / `DELETE` for `/api/config/values` — Create/Update/Delete
-  for config values (admin only, once auth exists)
 - Any `/api/config/organization`, `/api/config/numbering`, or
   `/api/config/lifecycle` endpoints (Modules 01, 06, 07 — distinct
   structures, not the generic category/value pattern)

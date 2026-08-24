@@ -4,8 +4,8 @@ What's actually built, right now, versus what's designed but not
 built. Update this file as part of any chunk of work — it goes stale
 fast if left for later.
 
-Last updated: reflects Configuration Engine (Module 05) deployed and
-verified on DEV and TEST. Chunk labels use the consolidated
+Last updated: reflects Configuration Engine CRUD (v0.6.0) deployed
+and verified on DEV and TEST. Chunk labels use the consolidated
 12-chunk roadmap (`DECISIONS.md` D010).
 
 ## Chunk status
@@ -24,7 +24,7 @@ absorbed from this repo's earlier ad hoc numbering.
 | ↳ Database Foundation | v0.2.0 | Done | 15 schemas + system.SchemaVersions + system.AuditLog, applied to DEV + TEST |
 | ↳ CMDB Core (cross-cutting, delivered early) | v0.3.5 | Done | cmdb schema, cmdb.AzureResources, API, seed data, Azure Info UI — DEV + TEST |
 | ↳ Configuration Engine — core (Module 05) | v0.5.0 | **Done** | `cfg.ConfigCategories` + `cfg.ConfigValues`, 7 seeded categories, GET APIs, Configuration UI — migration 003 applied and verified on DEV + TEST |
-| ↳ Configuration Engine — CRUD | — | Not started | Create/Update/Delete for config values via UI |
+| ↳ Configuration Engine — CRUD | v0.6.0 | **Done** | Create/Update/Deactivate for config values via UI — migration 004 applied and feature verified end-to-end on DEV + TEST |
 | ↳ Organization (Module 01), Numbering (Module 06), Lifecycle (Module 07) | — | Not started | Each needs its own structure, not the generic category/value pattern |
 | ↳ Section 106 — Branding & Theme Engine | — | Designed, not built | Folds into Chunk 02 per D009 |
 | **Chunk 03 — Portfolio / Program / Project Core** | — | Not started | Modules 02, 03, 04 |
@@ -58,8 +58,8 @@ absorbed from this repo's earlier ad hoc numbering.
 - Any business module (Portfolio, Program, Project, WBS, Schedule,
   RMG, Financials, RAID, Governance, Audit, Gap Assessment, etc.) —
   all show as greyed-out placeholders in the shell nav
-- Generic Configuration Engine (Chunk 02) — core (Module 05) is
-  **deployed and verified** on DEV + TEST; Create/Update/Delete and
+- Generic Configuration Engine (Chunk 02) — core (Module 05) and
+  CRUD are both **deployed and verified** on DEV + TEST;
   Organization/Numbering/Lifecycle (Modules 01, 06, 07) remain unbuilt
 - Branding & Theme Engine (Section 106 — designed only)
 - CMDB tabs other than Azure Info (Environments, Repositories,
