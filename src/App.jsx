@@ -4,6 +4,9 @@ import AzureInfoPage from './pages/AzureInfoPage.jsx';
 import SystemHealthPage from './pages/SystemHealthPage.jsx';
 import ConfigurationPage from './pages/ConfigurationPage.jsx';
 import OrganizationPage from './pages/OrganizationPage.jsx';
+import NumberingPage from './pages/NumberingPage.jsx';
+import LifecyclePage from './pages/LifecyclePage.jsx';
+import BrandingPage from './pages/BrandingPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 // Top-level navigation, per Framework Section 87.
@@ -29,7 +32,9 @@ const ADMIN_ITEMS = [
   { id: 'admin-health', label: 'System Health', built: true },
   { id: 'admin-org', label: 'Organization', built: true },
   { id: 'admin-config', label: 'Project Configuration', built: true },
-  { id: 'admin-numbering', label: 'Numbering', built: false },
+  { id: 'admin-numbering', label: 'Numbering', built: true },
+  { id: 'admin-lifecycle', label: 'Lifecycle / Stage-Gate', built: true },
+  { id: 'admin-branding', label: 'Branding & Theme', built: true },
   { id: 'admin-rules', label: 'Rules', built: false },
   { id: 'admin-templates', label: 'Global Templates', built: false },
   { id: 'admin-modules', label: 'Modules', built: false },
@@ -50,6 +55,9 @@ export default function App() {
       if (activeAdmin === 'admin-health') return <SystemHealthPage />;
       if (activeAdmin === 'admin-config') return <ConfigurationPage />;
       if (activeAdmin === 'admin-org') return <OrganizationPage />;
+      if (activeAdmin === 'admin-numbering') return <NumberingPage />;
+      if (activeAdmin === 'admin-lifecycle') return <LifecyclePage />;
+      if (activeAdmin === 'admin-branding') return <BrandingPage />;
     }
 
     const navItem = NAV_ITEMS.find((i) => i.id === activeNav);
