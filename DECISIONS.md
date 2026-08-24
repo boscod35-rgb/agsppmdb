@@ -162,3 +162,39 @@ deployed state changed as a result of this decision. Existing
 the source of truth for what shipped when; only the chunk labels
 attached to them changed. `CURRENT_STATUS.md` reflects the
 consolidated numbering going forward.
+
+---
+
+### D011 — Project Workspace tab visibility reuses the generic Configuration Engine
+
+The Project Workspace shell (Chunk 03) needs "visibility driven by
+which modules are enabled" per the master scope document. Rather
+than building a bespoke `ModuleSettings` table plus its own admin
+UI, a `WorkspaceModules` category was added to the existing
+`cfg.ConfigCategories`/`cfg.ConfigValues` engine (migration 007),
+with one value per tab (Overview, Gap Assessment, Schedule, ...).
+The existing Configuration UI's Deactivate button already works as
+an on/off switch for each tab with zero new admin code.
+
+**Status:** Deliberate, consistent with framework Section 8
+(Configure First). Revisit only if tab visibility ever needs
+per-project (not platform-wide) control, which the generic engine
+doesn't support.
+
+---
+
+### D012 — Numbering Rules now really increment, not just preview
+
+Migration 006 seeded `cfg.NumberingRules` with a `CurrentSequence`
+column and a preview endpoint, but explicitly deferred a real
+increment "until real entities exist to consume it." Chunk 03 is
+that point: creating a Portfolio, Program, or Project now runs
+`UPDATE cfg.NumberingRules SET CurrentSequence = CurrentSequence + 1
+OUTPUT ...` inside the same SQL transaction as the entity insert, so
+a failed create never burns a sequence number and a successful one
+can never race another concurrent create onto the same code.
+
+**Status:** Deliberate. If Risk/Issue (which also have starter
+Numbering rules from migration 006) get their own tables in a later
+chunk, they should follow this same transactional-increment pattern
+rather than the old non-incrementing preview-only approach.

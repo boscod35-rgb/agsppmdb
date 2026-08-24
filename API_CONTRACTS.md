@@ -251,13 +251,173 @@ framework's Deactivate/Archive pattern (Section 95).
 
 ---
 
+## GET/POST/PUT/DELETE /api/org/{resource}/{id?}
+
+`resource` is one of `business-units`, `departments`, `locations`
+(Module 01). `departments` supports `?businessUnit=CODE` filter on
+GET. PUT/DELETE require `{id}`. DELETE soft-deletes (`IsActive = 0`).
+
+**Success shapes:** `{ success, count, businessUnits: [...] }` /
+`{ success, count, departments: [...] }` / `{ success, count, locations: [...] }`
+on GET (list); `{ success, businessUnit }` / `{ success, department }` /
+`{ success, location }` on GET-one, POST, PUT.
+
+**Failure:** `VALIDATION_FAILED` (400), `NOT_FOUND` (404, includes
+an unknown `resource` segment or a referenced Business Unit that
+doesn't exist), `DUPLICATE_CODE` (500), `SCHEMA_MISSING` (500).
+
+---
+
+## GET/POST/PUT/DELETE /api/config/numbering/{id?}/{action?}
+
+Module 06. GET (no id) lists all rules with a computed
+`PreviewNext` field. `GET /{id}/preview` returns just the preview
+string without incrementing anything. POST creates a rule
+(`entityType` required). PUT/DELETE require `{id}`; DELETE
+soft-deletes.
+
+**Success (list):** `{ success, count, rules: [{ NumberingRuleId, EntityType, Prefix, Suffix, Separator, SequenceLength, CurrentSequence, ResetRule, IsActive, PreviewNext, ... }] }`
+
+**Failure:** `VALIDATION_FAILED` (400), `NOT_FOUND` (404), `DUPLICATE_ENTITY_TYPE` (500), `SCHEMA_MISSING` (500).
+
+Note: this endpoint only *previews* — it never increments
+`CurrentSequence`. Real, atomic generation happens inline inside
+`POST /api/ppm/portfolios`, `POST /api/ppm/programs`, and
+`POST /api/ppm/projects` (see below).
+
+---
+
+## GET/POST/PUT/DELETE /api/config/lifecycle/{id?}/{sub?}/{subId?}
+
+Module 07. GET (no id) lists all lifecycles, each with a nested
+`phases` array. POST creates a lifecycle. PUT/DELETE `{id}` update
+or soft-delete a lifecycle. `POST /{id}/phases` adds a phase;
+`PUT /{id}/phases/{phaseId}` and `DELETE /{id}/phases/{phaseId}`
+update or soft-delete one phase (does not touch the parent
+lifecycle's `IsActive`).
+
+**Success (list):** `{ success, count, lifecycles: [{ LifecycleId, LifecycleCode, LifecycleName, Version, IsActive, phases: [...] }] }`
+
+**Failure:** `VALIDATION_FAILED` (400), `NOT_FOUND` (404), `DUPLICATE_CODE` (500), `SCHEMA_MISSING` (500).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/portfolios/{id?}
+
+Module 02, added in Chunk 03. GET (no id) lists all portfolios,
+joined with Business Unit and Status label. GET `/{id}` returns one.
+POST creates — `name` is required; `businessUnitCode`, `ownerName`,
+`statusCode` (from the `PortfolioStatus` config category),
+`description`, `notes` are all optional. `PortfolioCode` is
+generated server-side from `cfg.NumberingRules` (EntityType =
+`Portfolio`) inside the same transaction as the insert — never
+supply it. PUT `/{id}` updates any of the same fields (send `null`
+to clear an optional field). DELETE `/{id}` archives
+(`IsActive = 0`, never a hard delete — the UI labels this "Archive").
+
+**Success (create/update/get-one):**
+```json
+{
+  "success": true,
+  "portfolio": {
+    "PortfolioId": 1,
+    "PortfolioCode": "PF-001",
+    "PortfolioName": "Digital Transformation",
+    "BusinessUnitCode": "IT",
+    "BusinessUnitName": "Information Technology",
+    "OwnerName": "J. Smith",
+    "StatusCode": "ACTIVE",
+    "StatusLabel": "Active",
+    "IsActive": true
+  }
+}
+```
+
+**Failure:** `VALIDATION_FAILED` (400, missing `name`), `NOT_FOUND`
+(404, unknown portfolio id, business unit code, or status code),
+`DUPLICATE_CODE` (500), `SCHEMA_MISSING` (500, run migration 007).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/programs/{id?}
+
+Module 03, added in Chunk 03. GET (no id) lists all programs, joined
+with Portfolio and Status label; supports `?portfolio=CODE` filter.
+POST creates — `name` and `portfolioCode` are required;
+`programManagerName`, `statusCode` (from `ProgramStatus`),
+`description`, `notes` are optional. `ProgramCode` is
+server-generated the same transactional way as Portfolio. PUT/DELETE
+work the same as Portfolios (DELETE archives).
+
+**Failure:** `VALIDATION_FAILED` (400, missing `name`/`portfolioCode`),
+`NOT_FOUND` (404, unknown program id, portfolio code, or status
+code), `DUPLICATE_CODE` (500), `SCHEMA_MISSING` (500).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/projects/{id?}
+
+Module 04, added in Chunk 03. The first endpoint built for the
+framework's explicit 250+ project scale.
+
+**GET (list) query parameters:**
+
+| Param | Values | Behavior |
+|---|---|---|
+| `page` | integer | default 1 |
+| `pageSize` | integer | default 25, capped at 100 |
+| `search` | text | matches `ProjectName` or `ProjectCode` (contains) |
+| `status` | `ProjectStatus` ValueCode | e.g. `ACTIVE` |
+| `portfolio` | PortfolioCode | e.g. `PF-001` |
+| `program` | ProgramCode | e.g. `PG-0001` |
+| `sortBy` | `ProjectName` \| `ProjectCode` \| `CreatedDate` \| `StartDate` \| `TargetEndDate` | default `ProjectName` |
+| `sortDir` | `asc` \| `desc` | default `asc` |
+| `includeInactive` | `true` | include archived projects (default: active only) |
+
+**Success (list):**
+```json
+{
+  "success": true,
+  "page": 1,
+  "pageSize": 25,
+  "totalCount": 253,
+  "totalPages": 11,
+  "projects": [ { "ProjectId": 1, "ProjectCode": "PRJ-00001", "ProjectName": "...", "PortfolioName": "...", "ProgramName": null, "StatusLabel": "Active", "HealthStatusLabel": "Green", "TargetEndDate": "2026-12-01", "...": "..." } ]
+}
+```
+
+GET `/{id}` returns one project, fully joined with Portfolio,
+Program, and every Chunk 02 picklist (Type, Category, Size,
+Complexity, Priority, Status, Health Status) plus Lifecycle.
+
+**POST** creates — `name` and `portfolioCode` are required;
+`programCode`, `projectManagerName`, `projectTypeCode`,
+`projectCategoryCode`, `projectSizeCode`, `projectComplexityCode`,
+`projectPriorityCode`, `statusCode`, `healthStatusCode`,
+`lifecycleCode`, `startDate`, `targetEndDate`, `description`,
+`notes` are all optional. `ProjectCode` is server-generated
+(EntityType = `Project`) inside the same transaction as the insert
+and every picklist code is validated against `cfg.ConfigValues`
+before the insert runs.
+
+**PUT** `/{id}` updates any of the same fields (send `null` to clear
+an optional field). **DELETE** `/{id}` archives (`IsActive = 0`).
+
+**Failure:** `VALIDATION_FAILED` (400, missing `name`/`portfolioCode`),
+`NOT_FOUND` (404, unknown project id, or any referenced portfolio /
+program / picklist code / lifecycle code), `DUPLICATE_CODE` (500),
+`SCHEMA_MISSING` (500, run migration 007).
+
+---
+
 ## Planned, not yet built
 
 - `GET /api/cmdb/azure-resources/{id}` — single record
 - `POST /api/cmdb/azure-resources` — create (admin only, once auth exists)
 - `PUT /api/cmdb/azure-resources/{id}` — update (admin only)
 - `POST /api/cmdb/azure-resources/{id}/verify` — bump `LastVerifiedDate` only
-- Any `/api/config/organization`, `/api/config/numbering`, or
-  `/api/config/lifecycle` endpoints (Modules 01, 06, 07 — distinct
-  structures, not the generic category/value pattern)
-- Any `/api/config/branding` endpoint (Section 106, folds into Chunk 02)
+- Any content behind the Project Workspace tabs (Chunk 04 onward)
+- Lifecycle Gates endpoints (approval requirements between phases)
+- Any `/api/config/branding` endpoint that actually applies the
+  theme at runtime (Section 106 — data model + management UI exist,
+  runtime application deferred)

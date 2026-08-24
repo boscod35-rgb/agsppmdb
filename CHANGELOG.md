@@ -11,6 +11,108 @@ current chunk numbering.
 
 ---
 
+## v0.9.0 — Portfolio / Program / Project Core (Chunk 03)
+
+**Added**
+- `ppm.Portfolios`, `ppm.Programs`, `ppm.Projects` tables (migration
+  `007_portfolio_program_project.sql`) — the first business-data
+  tables in the platform; everything before this chunk was
+  configuration scaffolding
+- `cfg.ConfigCategories`/`cfg.ConfigValues` additions: `PortfolioStatus`,
+  `ProgramStatus`, and `WorkspaceModules` — the last of these drives
+  which Project Workspace tabs render, reusing the existing generic
+  Configuration Engine and its existing Deactivate button as an
+  on/off switch instead of a bespoke table (see `DECISIONS.md` D011)
+- `cfg.NumberingRules` — added the missing `Program` rule (`Portfolio`
+  and `Project` rules were already seeded by migration 006)
+- Real business-visible ID generation: creating a Portfolio, Program,
+  or Project now atomically increments `cfg.NumberingRules.CurrentSequence`
+  inside the same SQL transaction as the insert (previously only a
+  non-incrementing preview existed — see `DECISIONS.md` D012)
+- `GET/POST/PUT/DELETE /api/ppm/portfolios/{id?}`
+- `GET/POST/PUT/DELETE /api/ppm/programs/{id?}` (`?portfolio=CODE` filter)
+- `GET/POST/PUT/DELETE /api/ppm/projects/{id?}` — list supports
+  `page`, `pageSize`, `search`, `status`, `portfolio`, `program`,
+  `sortBy`, `sortDir`, `includeInactive`, indexed for the framework's
+  explicit 250+ project requirement
+- `src/pages/PortfolioPage.jsx`, `src/pages/ProgramPage.jsx`,
+  `src/pages/ProjectsPage.jsx` — Create/Edit/Archive UI (Archive =
+  `IsActive = 0`, same soft-delete convention as every other module)
+- `src/pages/ProjectWorkspacePage.jsx` — navigation shell only
+  (Overview, Gap Assessment, Schedule, Resources, Financials, RAID,
+  Governance, Audits, Documents, History tabs); every tab shows a
+  placeholder, no module content yet
+- `src/App.jsx` — Portfolio, Programs, Projects nav items flipped
+  from placeholder to `built: true`
+
+**Database**
+- Migration `007_portfolio_program_project.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+**QA**
+- Verification query confirmed 4 PortfolioStatus values, 5 ProgramStatus
+  values, 10 WorkspaceModules values, 1 new Program numbering rule,
+  and all three `ppm` tables present on both DEV and TEST
+- Created a Portfolio, a Program under it, and a Project under both —
+  confirmed generated codes (`PF-`, `PG-`, `PRJ-` prefixes) matched
+  the Numbering UI's preview pattern and incremented correctly on a
+  second create
+- Confirmed archiving a Project keeps it queryable via
+  `includeInactive=true` and hides it from the default list
+
+**Out of scope (documented, not a gap)**
+- Lifecycle Gates (approval requirements between phases) — carried
+  forward from Chunk 02
+- Any content behind the Project Workspace tabs — Chunk 04 onward
+- Bulk import of the 250+ existing projects — later, once a real
+  onboarding module is scoped
+
+---
+
+## v0.8.0 — Numbering, Lifecycle, Branding (backfill entry)
+
+Applied earlier in this project's history but not recorded in this
+file at the time — added retroactively so the version history stays
+continuous. See `database/migrations/006_numbering_lifecycle_branding.sql`
+for full detail.
+
+**Added**
+- `cfg.NumberingRules` (Module 06) with Project/Risk/Issue/Portfolio
+  starter rules
+- `cfg.Lifecycles` + `cfg.LifecyclePhases` (Module 07) with a
+  Standard Project Lifecycle starter (Initiation/Planning/Execution/Closure)
+- `cfg.BrandThemes` (Section 106) — data model + management UI only;
+  not yet applied to the live app's actual colors/fonts
+- `src/pages/NumberingPage.jsx`, `src/pages/LifecyclePage.jsx`,
+  `src/pages/BrandingPage.jsx`
+
+**Database**
+- Migration `006_numbering_lifecycle_branding.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+---
+
+## v0.7.0 — Organization (backfill entry)
+
+Applied earlier in this project's history but not recorded in this
+file at the time — added retroactively so the version history stays
+continuous. See `database/migrations/005_organization.sql` for full detail.
+
+**Added**
+- `org.BusinessUnits`, `org.Departments`, `org.Locations` (Module 01)
+- `GET/POST/PUT/DELETE /api/org/{resource}/{id?}` (resource = one of
+  `business-units`, `departments`, `locations`)
+- `src/pages/OrganizationPage.jsx`
+
+**Database**
+- Migration `005_organization.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+---
+
 ## v0.6.0 — Configuration Engine CRUD
 
 **Added**

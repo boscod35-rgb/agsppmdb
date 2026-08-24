@@ -71,11 +71,19 @@ contradiction being recorded in `DECISIONS.md`.
 
 ```
 src/                      React frontend
-src/pages/                 Page components (Home, AzureInfoPage,
-                            SystemHealthPage, PlaceholderPage)
-api/src/functions/          Azure Functions (health, dbTest,
-                            cmdbAzureResources)
-database/migrations/         Numbered SQL migration files
+src/pages/                 Page components: HomePage, AzureInfoPage,
+                            SystemHealthPage, ConfigurationPage,
+                            OrganizationPage, NumberingPage,
+                            LifecyclePage, BrandingPage,
+                            PortfolioPage, ProgramPage, ProjectsPage,
+                            ProjectWorkspacePage, PlaceholderPage
+api/src/functions/          Azure Functions: health, dbTest,
+                            cmdbAzureResources, configCategories,
+                            configValues, organization, numbering,
+                            lifecycle, branding, portfolios,
+                            programs, projects
+database/migrations/         Numbered SQL migration files (currently
+                              through 007)
 staticwebapp.config.json      SWA routing config
 ```
 

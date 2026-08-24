@@ -34,6 +34,9 @@ original file. (framework Section 92)
 | 002 | `002_cmdb.sql` | DEV, TEST | `cmdb` schema + `cmdb.AzureResources` + seed data |
 | 003 | `003_config_engine.sql` | DEV, TEST | `cfg.ConfigCategories` + `cfg.ConfigValues` + seed data (Configuration Engine core, Module 05) |
 | 004 | `004_config_crud.sql` | DEV, TEST | `UpdatedDate` + `UpdatedBy` columns on `cfg.ConfigValues` (Configuration Engine CRUD) |
+| 005 | `005_organization.sql` | DEV, TEST | `org.BusinessUnits` + `org.Departments` + `org.Locations` + seed data (Module 01) |
+| 006 | `006_numbering_lifecycle_branding.sql` | DEV, TEST | `cfg.NumberingRules` (Module 06) + `cfg.Lifecycles`/`cfg.LifecyclePhases` (Module 07) + `cfg.BrandThemes` (Section 106, data model only) |
+| 007 | `007_portfolio_program_project.sql` | DEV, TEST | `ppm.Portfolios` + `ppm.Programs` + `ppm.Projects` (Modules 02/03/04); `PortfolioStatus`/`ProgramStatus`/`WorkspaceModules` config categories; Program numbering rule |
 
 Every database independently tracks which migrations it has via its
 own `system.SchemaVersions` table — DEV and TEST each have their own
@@ -50,9 +53,12 @@ workflow     notify       document     security     system
 Plus `cmdb` (created by migration 002 — not in the original 15,
 added when the CMDB module was scoped).
 
-All currently empty except `system` and `cmdb` — no business tables
-exist yet (Portfolio, Project, RAID, etc. all come in later chunks
-per `CURRENT_STATUS.md`).
+As of migration 007: `system`, `cmdb`, `cfg`, `org`, and `ppm` are in
+use. `ppm` holds the first true business-data tables (Portfolios,
+Programs, Projects). `schedule`, `resource`, `finance`, `raid`,
+`gov`, `audit`, `assessment`, `workflow`, `notify`, `document`, and
+`security` remain empty — those come in Chunk 04 onward per
+`CURRENT_STATUS.md`.
 
 ## system.SchemaVersions
 
@@ -143,21 +149,111 @@ UpdatedBy                                     NVARCHAR(200) NULL   -- added in m
 UNIQUE (CategoryId, ValueCode)
 ```
 
-Seeded with 7 categories (Project Type, Category, Size, Complexity,
-Priority, Status, Health Status) matching Module 05's initial config
-list, each with a handful of starter/example values — see
-`003_config_engine.sql` for exact values. Organization (Module 01),
-Numbering Rules (Module 06), and Lifecycle/Stage-Gate (Module 07)
-are deliberately not modeled as `cfg.ConfigValues` rows — each needs
-its own structure and gets its own future migration.
-
-**Applied to DEV and TEST**, verified via the migration's built-in
-check query (7 categories, correct value counts on both).
+Seeded with 10 categories total as of migration 007: the original 7
+Module 05 picklists (Project Type, Category, Size, Complexity,
+Priority, Status, Health Status), plus `PortfolioStatus`,
+`ProgramStatus`, and `WorkspaceModules` added in migration 007.
+Organization (Module 01), Numbering Rules (Module 06), and
+Lifecycle/Stage-Gate (Module 07) are still deliberately not modeled
+as `cfg.ConfigValues` rows — each needed its own structure and got
+its own migration (005, 006, 006 respectively).
 
 Full CRUD is live via `/api/config/values` (see `API_CONTRACTS.md`):
 create, update, and deactivate (soft-delete — `IsActive = 0`, never
 a hard `DELETE`) are all supported and verified end-to-end on both
 environments (migration `004_config_crud.sql`).
+
+## org.BusinessUnits / org.Departments / org.Locations
+
+```sql
+org.BusinessUnits: BusinessUnitId PK, BusinessUnitCode UNIQUE, BusinessUnitName,
+  IsActive, Notes, CreatedDate/By, UpdatedDate/By
+org.Departments:   DepartmentId PK, DepartmentCode UNIQUE, DepartmentName,
+  BusinessUnitId FK -> org.BusinessUnits, IsActive, Notes, CreatedDate/By, UpdatedDate/By
+org.Locations:     LocationId PK, LocationCode UNIQUE, LocationName, Country, TimeZone,
+  IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD via `/api/org/{resource}/{id?}` (`resource` = `business-units`,
+`departments`, or `locations`). Applied and verified DEV + TEST
+(migration `005_organization.sql`).
+
+## cfg.NumberingRules
+
+```sql
+NumberingRuleId  INT IDENTITY PRIMARY KEY
+EntityType         NVARCHAR(50) NOT NULL UNIQUE   -- Portfolio, Program, Project, Risk, Issue
+Prefix                NVARCHAR(20) DEFAULT ''
+Suffix                  NVARCHAR(20) DEFAULT ''
+Separator                 NVARCHAR(5) DEFAULT '-'
+SequenceLength               INT DEFAULT 5
+StartingNumber                  INT DEFAULT 1
+CurrentSequence                    INT DEFAULT 0   -- real, atomic increment as of migration 007 (D012)
+ResetRule                             NVARCHAR(20) DEFAULT 'Never' CHECK IN ('Never','Monthly','Annual')
+IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+`GET /api/config/numbering/{id?}/preview` still exists for the
+Numbering admin UI. Real generation (used by Portfolio/Program/Project
+create) lives inline in `portfolios.js`/`programs.js`/`projects.js` —
+see `API_CONTRACTS.md`.
+
+## cfg.Lifecycles / cfg.LifecyclePhases
+
+```sql
+cfg.Lifecycles:       LifecycleId PK, LifecycleCode UNIQUE, LifecycleName, Version,
+  IsActive, Notes, CreatedDate/By, UpdatedDate/By
+cfg.LifecyclePhases:  PhaseId PK, LifecycleId FK -> cfg.Lifecycles, PhaseName,
+  SequenceOrder, IsRequired, IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD (including nested phase management) via
+`/api/config/lifecycle/{id?}/{sub?}/{subId?}`. Seeded with one
+Standard Project Lifecycle (Initiation/Planning/Execution/Closure).
+Lifecycle Gates (approval requirements between phases) are **not**
+built — only the phase structure itself.
+
+## cfg.BrandThemes
+
+Data model + management UI only — the live app does not read from
+this table yet. See `006_numbering_lifecycle_branding.sql` for the
+full column list; not repeated here since nothing consumes it at
+runtime yet.
+
+## ppm.Portfolios / ppm.Programs / ppm.Projects
+
+The first business-data tables in the platform (Chunk 03, migration
+`007_portfolio_program_project.sql`). Every picklist-style attribute
+is a foreign key into `cfg.ConfigValues`, never a hardcoded list —
+Configure First applies here same as everywhere else.
+
+```sql
+ppm.Portfolios: PortfolioId PK, PortfolioCode UNIQUE, PortfolioName,
+  BusinessUnitId FK -> org.BusinessUnits (nullable),
+  OwnerName (free text - no security module yet), StatusValueId FK -> cfg.ConfigValues,
+  Description, IsActive (Archive = 0), Notes, CreatedDate/By, UpdatedDate/By
+
+ppm.Programs: ProgramId PK, ProgramCode UNIQUE, ProgramName,
+  PortfolioId FK -> ppm.Portfolios (required), ProgramManagerName,
+  StatusValueId FK -> cfg.ConfigValues, Description, IsActive, Notes, CreatedDate/By, UpdatedDate/By
+
+ppm.Projects: ProjectId PK, ProjectCode UNIQUE, ProjectName,
+  PortfolioId FK -> ppm.Portfolios (required), ProgramId FK -> ppm.Programs (nullable),
+  ProjectManagerName,
+  ProjectTypeValueId / ProjectCategoryValueId / ProjectSizeValueId /
+  ProjectComplexityValueId / ProjectPriorityValueId / StatusValueId /
+  HealthStatusValueId  -- all FK -> cfg.ConfigValues, all nullable
+  LifecycleId FK -> cfg.Lifecycles (nullable),
+  StartDate, TargetEndDate, Description, IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+`ppm.Projects` is indexed on `PortfolioId`, `ProgramId`,
+`StatusValueId`, `ProjectName`, and `IsActive` to support the
+framework's explicit 250+ project pagination/search/filter/sort
+requirement. Full CRUD + paginated list via `/api/ppm/portfolios`,
+`/api/ppm/programs`, `/api/ppm/projects` (see `API_CONTRACTS.md`).
+"Archive" is the UI label for the same `IsActive = 0` soft-delete
+convention used everywhere else in this codebase.
 
 ## Credentials reference (usernames and env var names ONLY — no
 ## passwords appear in this file or anywhere in the repo)

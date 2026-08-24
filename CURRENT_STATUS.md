@@ -4,9 +4,9 @@ What's actually built, right now, versus what's designed but not
 built. Update this file as part of any chunk of work — it goes stale
 fast if left for later.
 
-Last updated: reflects Configuration Engine CRUD (v0.6.0) deployed
-and verified on DEV and TEST. Chunk labels use the consolidated
-12-chunk roadmap (`DECISIONS.md` D010).
+Last updated: reflects Portfolio / Program / Project Core (v0.9.0)
+deployed and verified on DEV and TEST. Chunk labels use the
+consolidated 12-chunk roadmap (`DECISIONS.md` D010).
 
 ## Chunk status
 
@@ -20,14 +20,20 @@ absorbed from this repo's earlier ad hoc numbering.
 | ↳ Connectivity Baseline | v0.1.0 | Done, frozen | React -> Azure Functions -> Azure SQL proven on DEV |
 | ↳ Platform Foundations | v0.1.5 | Partial | DEV + TEST fully provisioned; **PROD deferred (cost)** |
 | ↳ Application Shell | v0.4.0 | Done | Main nav + Administration sub-nav, DEV + TEST |
-| **Chunk 02 — Database Foundation + Configuration Engine** | v0.2.0–v0.3.5 | Partial | absorbs former CHUNK 01, 02.5; Configuration Engine itself not started |
+| **Chunk 02 — Database Foundation + Configuration Engine** | v0.2.0–v0.8.0 | **Done** (except Branding runtime) | absorbs former CHUNK 01, 02.5 |
 | ↳ Database Foundation | v0.2.0 | Done | 15 schemas + system.SchemaVersions + system.AuditLog, applied to DEV + TEST |
 | ↳ CMDB Core (cross-cutting, delivered early) | v0.3.5 | Done | cmdb schema, cmdb.AzureResources, API, seed data, Azure Info UI — DEV + TEST |
-| ↳ Configuration Engine — core (Module 05) | v0.5.0 | **Done** | `cfg.ConfigCategories` + `cfg.ConfigValues`, 7 seeded categories, GET APIs, Configuration UI — migration 003 applied and verified on DEV + TEST |
-| ↳ Configuration Engine — CRUD | v0.6.0 | **Done** | Create/Update/Deactivate for config values via UI — migration 004 applied and feature verified end-to-end on DEV + TEST |
-| ↳ Organization (Module 01), Numbering (Module 06), Lifecycle (Module 07) | — | Not started | Each needs its own structure, not the generic category/value pattern |
-| ↳ Section 106 — Branding & Theme Engine | — | Designed, not built | Folds into Chunk 02 per D009 |
-| **Chunk 03 — Portfolio / Program / Project Core** | — | Not started | Modules 02, 03, 04 |
+| ↳ Configuration Engine — core (Module 05) | v0.5.0 | Done | `cfg.ConfigCategories` + `cfg.ConfigValues`, GET APIs, Configuration UI — migration 003 |
+| ↳ Configuration Engine — CRUD | v0.6.0 | Done | Create/Update/Deactivate for config values via UI — migration 004 |
+| ↳ Organization (Module 01) | v0.7.0 | Done | `org.BusinessUnits`/`Departments`/`Locations` — migration 005 |
+| ↳ Numbering (Module 06) | v0.8.0 | Done | `cfg.NumberingRules` — migration 006 |
+| ↳ Lifecycle / Stage-Gate (Module 07) | v0.8.0 | Partial | Phase structure done; Lifecycle Gates (approvals between phases) not built — migration 006 |
+| ↳ Section 106 — Branding & Theme Engine | v0.8.0 | Partial | Data model + management UI done; **runtime application to the live app deferred** — its own focused round |
+| **Chunk 03 — Portfolio / Program / Project Core** | v0.9.0 | **Done** | Modules 02, 03, 04 — migration 007 |
+| ↳ Portfolio | v0.9.0 | Done | Create/Edit/Archive, Business Unit mapping, owner, status |
+| ↳ Program | v0.9.0 | Done | Portfolio mapping, Program Manager, status |
+| ↳ Project | v0.9.0 | Done | Portfolio + optional Program mapping, PM, all Chunk 02 picklists, Lifecycle assignment, business-visible ID, server-side pagination/search/filter/sort |
+| ↳ Project Workspace Shell | v0.9.0 | Done (shell only) | Nav tabs driven by WorkspaceModules config; no tab content yet |
 | **Chunk 04 onward** | — | Not started | Modules 08–40; see master framework doc for full breakdown |
 
 ## What works right now, per environment
@@ -41,10 +47,19 @@ absorbed from this repo's earlier ad hoc numbering.
 | `/api/cmdb/azure-resources` | ✓ | ✓ | — |
 | `/api/config/categories` | ✓ | ✓ | — |
 | `/api/config/values` | ✓ | ✓ | — |
+| `/api/org/{resource}` | ✓ | ✓ | — |
+| `/api/config/numbering` | ✓ | ✓ | — |
+| `/api/config/lifecycle` | ✓ | ✓ | — |
+| `/api/ppm/portfolios` | ✓ | ✓ | — |
+| `/api/ppm/programs` | ✓ | ✓ | — |
+| `/api/ppm/projects` | ✓ | ✓ | — |
 | Application shell (nav) | ✓ | ✓ | — |
 | CMDB -> Azure Info page | ✓ | ✓ | — |
 | Administration -> System Health page | ✓ | ✓ | — |
 | Administration -> Project Configuration page | ✓ | ✓ | — |
+| Administration -> Organization / Numbering / Lifecycle / Branding pages | ✓ | ✓ | — |
+| Portfolio / Programs / Projects pages | ✓ | ✓ | — |
+| Project Workspace shell (nav only, no tab content) | ✓ | ✓ | — |
 
 ## URLs (also recorded in `cmdb.AzureResources` — check there first,
 ## this table can go stale)
@@ -55,13 +70,15 @@ absorbed from this repo's earlier ad hoc numbering.
 
 ## What's explicitly NOT built yet
 
-- Any business module (Portfolio, Program, Project, WBS, Schedule,
-  RMG, Financials, RAID, Governance, Audit, Gap Assessment, etc.) —
-  all show as greyed-out placeholders in the shell nav
-- Generic Configuration Engine (Chunk 02) — core (Module 05) and
-  CRUD are both **deployed and verified** on DEV + TEST;
-  Organization/Numbering/Lifecycle (Modules 01, 06, 07) remain unbuilt
-- Branding & Theme Engine (Section 106 — designed only)
+- Any module 08–40 content (WBS, Schedule, RMG, Financials, RAID,
+  Governance, Audit, Gap Assessment, etc.) — all show as greyed-out
+  placeholders in the shell nav; the Project Workspace's own tabs
+  for these are a nav shell only, no content
+- Lifecycle Gates (approval requirements between phases) — only the
+  phase structure itself was built
+- Branding & Theme Engine runtime application — data model + UI are
+  done, but the live app doesn't read its colors/fonts from
+  `cfg.BrandThemes` yet (deliberately deferred, its own round)
 - CMDB tabs other than Azure Info (Environments, Repositories,
   Credentials Reference, Contacts — structural placeholders only)
 - Authentication / RBAC
