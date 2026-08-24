@@ -2,6 +2,7 @@ import { useState } from 'react';
 import HomePage from './pages/HomePage.jsx';
 import AzureInfoPage from './pages/AzureInfoPage.jsx';
 import SystemHealthPage from './pages/SystemHealthPage.jsx';
+import ConfigurationPage from './pages/ConfigurationPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 // Top-level navigation, per Framework Section 87.
@@ -23,10 +24,10 @@ const NAV_ITEMS = [
 
 // Settings sub-navigation, per Framework Section 88.
 const ADMIN_ITEMS = [
-  { id: 'admin-cmdb', label: 'CMDB \u2192 Azure Info', built: true },
+  { id: 'admin-cmdb', label: 'CMDB → Azure Info', built: true },
   { id: 'admin-health', label: 'System Health', built: true },
   { id: 'admin-org', label: 'Organization', built: false },
-  { id: 'admin-config', label: 'Project Configuration', built: false },
+  { id: 'admin-config', label: 'Project Configuration', built: true },
   { id: 'admin-numbering', label: 'Numbering', built: false },
   { id: 'admin-rules', label: 'Rules', built: false },
   { id: 'admin-templates', label: 'Global Templates', built: false },
@@ -46,6 +47,7 @@ export default function App() {
       if (!current?.built) return <PlaceholderPage label={current?.label} />;
       if (activeAdmin === 'admin-cmdb') return <AzureInfoPage />;
       if (activeAdmin === 'admin-health') return <SystemHealthPage />;
+      if (activeAdmin === 'admin-config') return <ConfigurationPage />;
     }
 
     const navItem = NAV_ITEMS.find((i) => i.id === activeNav);
