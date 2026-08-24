@@ -7,17 +7,20 @@ import OrganizationPage from './pages/OrganizationPage.jsx';
 import NumberingPage from './pages/NumberingPage.jsx';
 import LifecyclePage from './pages/LifecyclePage.jsx';
 import BrandingPage from './pages/BrandingPage.jsx';
+import PortfolioPage from './pages/PortfolioPage.jsx';
+import ProgramPage from './pages/ProgramPage.jsx';
+import ProjectsPage from './pages/ProjectsPage.jsx';
+import ProjectWorkspacePage from './pages/ProjectWorkspacePage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 // Top-level navigation, per Framework Section 87.
-// Only Home and Administration are wired to real pages right now -
-// everything else is a placeholder until its own chunk builds it.
+// Portfolio / Programs / Projects flipped to built:true in Chunk 03.
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', built: true },
   { id: 'strategy', label: 'Strategy', built: false },
-  { id: 'portfolio', label: 'Portfolio', built: false },
-  { id: 'programs', label: 'Programs', built: false },
-  { id: 'projects', label: 'Projects', built: false },
+  { id: 'portfolio', label: 'Portfolio', built: true },
+  { id: 'programs', label: 'Programs', built: true },
+  { id: 'projects', label: 'Projects', built: true },
   { id: 'rmg', label: 'RMG / Resources', built: false },
   { id: 'financials', label: 'Financials', built: false },
   { id: 'governance', label: 'Governance', built: false },
@@ -44,6 +47,12 @@ const ADMIN_ITEMS = [
 export default function App() {
   const [activeNav, setActiveNav] = useState('home');
   const [activeAdmin, setActiveAdmin] = useState('admin-cmdb');
+  const [openProjectId, setOpenProjectId] = useState(null);
+
+  function goToNav(id) {
+    setActiveNav(id);
+    if (id !== 'projects') setOpenProjectId(null);
+  }
 
   function renderContent() {
     if (activeNav === 'home') return <HomePage />;
@@ -60,6 +69,13 @@ export default function App() {
       if (activeAdmin === 'admin-branding') return <BrandingPage />;
     }
 
+    if (activeNav === 'portfolio') return <PortfolioPage />;
+    if (activeNav === 'programs') return <ProgramPage />;
+    if (activeNav === 'projects') {
+      if (openProjectId) return <ProjectWorkspacePage projectId={openProjectId} onBack={() => setOpenProjectId(null)} />;
+      return <ProjectsPage onOpenProject={(id) => setOpenProjectId(id)} />;
+    }
+
     const navItem = NAV_ITEMS.find((i) => i.id === activeNav);
     return <PlaceholderPage label={navItem?.label} />;
   }
@@ -73,7 +89,7 @@ export default function App() {
             <button
               key={item.id}
               className={`topnav-item ${activeNav === item.id ? 'active' : ''} ${!item.built ? 'unbuilt' : ''}`}
-              onClick={() => setActiveNav(item.id)}
+              onClick={() => goToNav(item.id)}
             >
               {item.label}
             </button>
