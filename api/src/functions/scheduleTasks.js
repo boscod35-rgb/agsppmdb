@@ -4,7 +4,8 @@ const sql = require('mssql');
 // /api/ppm/schedule/tasks/{projectId}/{taskId?}/{sub?}/{subId?}
 //
 // GET    /{projectId} -> list tasks for the project, each with its
-//           dependencies nested (same pattern as templates.js's items)
+//           dependencies and effort entries nested (same pattern as
+//           templates.js's items)
 // POST   /{projectId} -> create a task (taskName required)
 // PUT    /{projectId}/{taskId} -> update a task
 // DELETE /{projectId}/{taskId} -> archive a task
@@ -12,6 +13,13 @@ const sql = require('mssql');
 //           (dependsOnTaskId required, dependencyTypeCode optional,
 //           defaults to FS)
 // DELETE /{projectId}/{taskId}/dependencies/{depId} -> remove a dependency
+// POST   /{projectId}/{taskId}/effort -> add an effort entry (Module
+//           23 - Task -> Resource -> Planned/Actual Effort).
+//           resourceCode required; plannedHours, actualHours,
+//           rateCardCode (explicit rate override), notes optional
+// PUT    /{projectId}/{taskId}/effort/{effortId} -> update an entry
+//           (this is how ActualHours gets recorded/reconciled over time)
+// DELETE /{projectId}/{taskId}/effort/{effortId} -> remove an entry
 
 function getConfig() {
   const { DB_SERVER, DB_DATABASE, DB_USER, DB_PASSWORD, DB_PORT } = process.env;
@@ -44,14 +52,17 @@ function classifyError(err) {
   const code = err.code || '';
   if (code === 'ELOGIN') return { error: 'SQL_AUTH_FAILED', detail: 'SQL authentication failed.' };
   if (code === 'ETIMEOUT' || code === 'ESOCKET') return { error: 'SQL_NETWORK_BLOCKED', detail: 'Could not reach the SQL server.' };
-  if (/Invalid object name.*ScheduleTasks/i.test(err.message || '') || /Invalid object name.*TaskDependencies/i.test(err.message || '')) {
-    return { error: 'SCHEMA_MISSING', detail: 'ppm.ScheduleTasks / ppm.TaskDependencies do not exist yet. Run migration 009_wbs_schedule_delivery.sql.' };
+  if (/Invalid object name.*ScheduleTasks/i.test(err.message || '') || /Invalid object name.*TaskDependencies/i.test(err.message || '') || /Invalid object name.*TaskEffort/i.test(err.message || '')) {
+    return { error: 'SCHEMA_MISSING', detail: 'ppm.ScheduleTasks / ppm.TaskDependencies / ppm.TaskEffort do not exist yet. Run migrations 009 and 011.' };
   }
   if (/CK_TaskDependencies_NotSelf/i.test(err.message || '')) {
     return { error: 'VALIDATION_FAILED', detail: 'A task cannot depend on itself.' };
   }
   if (/UQ_TaskDependencies/i.test(err.message || '')) {
     return { error: 'DUPLICATE_DEPENDENCY', detail: 'This dependency already exists between these two tasks.' };
+  }
+  if (/UQ_TaskEffort_ActiveTaskResource/i.test(err.message || '')) {
+    return { error: 'DUPLICATE_EFFORT', detail: 'This resource already has an active effort entry on this task.' };
   }
   return { error: 'DATABASE_UNAVAILABLE', detail: 'Unexpected database error.' };
 }
@@ -121,12 +132,26 @@ async function attachDependencies(pool, tasks) {
   return tasks.map((t) => ({ ...t, dependencies: result.recordset.filter((d) => d.TaskId === t.ScheduleTaskId) }));
 }
 
+async function attachEffort(pool, tasks) {
+  if (tasks.length === 0) return tasks;
+  const ids = tasks.map((t) => t.ScheduleTaskId);
+  const result = await pool.request().query(`
+    SELECT te.*, r.ResourceCode, r.ResourceName, rc.RateCardCode
+    FROM ppm.TaskEffort te
+    JOIN ppm.Resources r ON r.ResourceId = te.ResourceId
+    LEFT JOIN ppm.RateCards rc ON rc.RateCardId = te.RateCardId
+    WHERE te.ScheduleTaskId IN (${ids.join(',')}) AND te.IsActive = 1;
+  `);
+  return tasks.map((t) => ({ ...t, effort: result.recordset.filter((e) => e.ScheduleTaskId === t.ScheduleTaskId) }));
+}
+
 async function handleList(pool, projectId) {
   await assertProjectExists(pool.request(), projectId);
   const result = await pool.request().input('projectId', sql.Int, projectId)
     .query(`${SELECT_TASK} WHERE t.ProjectId = @projectId AND t.IsActive = 1 ORDER BY t.StartDate, t.TaskName;`);
   const withDeps = await attachDependencies(pool, result.recordset);
-  return { jsonBody: { success: true, count: withDeps.length, tasks: withDeps } };
+  const withEffort = await attachEffort(pool, withDeps);
+  return { jsonBody: { success: true, count: withEffort.length, tasks: withEffort } };
 }
 
 async function handleCreate(pool, projectId, request) {
@@ -230,6 +255,98 @@ async function handleRemoveDependency(pool, depId) {
   return { jsonBody: { success: true, message: `Dependency ${depId} removed.` } };
 }
 
+// ---- Effort sub-routes (Module 23) ----
+
+async function lookupResourceId(executor, resourceCode) {
+  const result = await executor.input('code', sql.NVarChar, resourceCode).query('SELECT ResourceId FROM ppm.Resources WHERE ResourceCode = @code');
+  if (result.recordset.length === 0) {
+    const err = new Error(`Resource "${resourceCode}" does not exist.`);
+    err.category = 'NOT_FOUND';
+    throw err;
+  }
+  return result.recordset[0].ResourceId;
+}
+
+async function lookupRateCardId(executor, rateCardCode) {
+  const result = await executor.input('code', sql.NVarChar, rateCardCode).query('SELECT RateCardId FROM ppm.RateCards WHERE RateCardCode = @code');
+  if (result.recordset.length === 0) {
+    const err = new Error(`Rate card "${rateCardCode}" does not exist.`);
+    err.category = 'NOT_FOUND';
+    throw err;
+  }
+  return result.recordset[0].RateCardId;
+}
+
+async function handleAddEffort(pool, projectId, taskId, request) {
+  await assertTaskExists(pool.request(), taskId, projectId);
+  const body = await request.json();
+  const { resourceCode, plannedHours, actualHours, rateCardCode, notes } = body || {};
+  if (!resourceCode) {
+    const err = new Error('resourceCode is required.');
+    err.category = 'VALIDATION';
+    throw err;
+  }
+  const resourceId = await lookupResourceId(pool.request(), resourceCode);
+  const rateCardId = rateCardCode ? await lookupRateCardId(pool.request(), rateCardCode) : null;
+
+  const result = await pool.request()
+    .input('taskId', sql.Int, taskId)
+    .input('resourceId', sql.Int, resourceId)
+    .input('rateCardId', sql.Int, rateCardId)
+    .input('plannedHours', sql.Decimal(7, 2), plannedHours ?? 0)
+    .input('actualHours', sql.Decimal(7, 2), actualHours ?? null)
+    .input('notes', sql.NVarChar, notes ?? null)
+    .query(`
+      INSERT INTO ppm.TaskEffort (ScheduleTaskId, ResourceId, RateCardId, PlannedHours, ActualHours, Notes)
+      OUTPUT INSERTED.EffortId
+      VALUES (@taskId, @resourceId, @rateCardId, @plannedHours, @actualHours, @notes);
+    `);
+  return { status: 201, jsonBody: { success: true, effortId: result.recordset[0].EffortId } };
+}
+
+async function handleUpdateEffort(pool, effortId, request) {
+  const existing = await pool.request().input('id', sql.Int, effortId).query('SELECT * FROM ppm.TaskEffort WHERE EffortId = @id');
+  if (existing.recordset.length === 0) {
+    const err = new Error(`Effort entry ${effortId} not found.`);
+    err.category = 'NOT_FOUND';
+    throw err;
+  }
+  const row = existing.recordset[0];
+  const body = await request.json();
+  const rateCardId = body.rateCardCode !== undefined
+    ? (body.rateCardCode === null ? null : await lookupRateCardId(pool.request(), body.rateCardCode))
+    : row.RateCardId;
+
+  const result = await pool.request()
+    .input('id', sql.Int, effortId)
+    .input('rateCardId', sql.Int, rateCardId)
+    .input('plannedHours', sql.Decimal(7, 2), body.plannedHours ?? row.PlannedHours)
+    .input('actualHours', sql.Decimal(7, 2), body.actualHours ?? row.ActualHours)
+    .input('isActive', sql.Bit, body.isActive ?? row.IsActive)
+    .input('notes', sql.NVarChar, body.notes ?? row.Notes)
+    .query(`
+      UPDATE ppm.TaskEffort SET RateCardId = @rateCardId, PlannedHours = @plannedHours, ActualHours = @actualHours,
+        IsActive = @isActive, Notes = @notes, UpdatedDate = SYSUTCDATETIME(), UpdatedBy = SUSER_SNAME()
+      OUTPUT INSERTED.*
+      WHERE EffortId = @id;
+    `);
+  return { jsonBody: { success: true, effort: result.recordset[0] } };
+}
+
+async function handleRemoveEffort(pool, effortId) {
+  const existing = await pool.request().input('id', sql.Int, effortId).query('SELECT EffortId FROM ppm.TaskEffort WHERE EffortId = @id');
+  if (existing.recordset.length === 0) {
+    const err = new Error(`Effort entry ${effortId} not found.`);
+    err.category = 'NOT_FOUND';
+    throw err;
+  }
+  await pool.request().input('id', sql.Int, effortId).query(`
+    UPDATE ppm.TaskEffort SET IsActive = 0, UpdatedDate = SYSUTCDATETIME(), UpdatedBy = SUSER_SNAME()
+    WHERE EffortId = @id;
+  `);
+  return { jsonBody: { success: true, message: `Effort entry ${effortId} removed.` } };
+}
+
 app.http('scheduleTasks', {
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   authLevel: 'anonymous',
@@ -246,6 +363,13 @@ app.http('scheduleTasks', {
         if (request.method === 'POST' && taskId) return await handleAddDependency(pool, projectId, taskId, request);
         if (request.method === 'DELETE' && subId) return await handleRemoveDependency(pool, subId);
         return { status: 400, jsonBody: { success: false, message: 'Invalid dependencies sub-route request.' } };
+      }
+
+      if (sub === 'effort') {
+        if (request.method === 'POST' && taskId) return await handleAddEffort(pool, projectId, taskId, request);
+        if (request.method === 'PUT' && subId) return await handleUpdateEffort(pool, subId, request);
+        if (request.method === 'DELETE' && subId) return await handleRemoveEffort(pool, subId);
+        return { status: 400, jsonBody: { success: false, message: 'Invalid effort sub-route request.' } };
       }
 
       if (request.method === 'GET' && !taskId) return await handleList(pool, projectId);
