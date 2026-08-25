@@ -133,6 +133,21 @@ async function lookupLifecycleId(executor, lifecycleCode) {
   return result.recordset[0].LifecycleId;
 }
 
+// Added in Chunk 04 (migration 008) - captures which Module 08
+// Template a project was created from. Purely informational at
+// this stage; actually instantiating a template's Process Matrix
+// as a real WBS checklist is out of scope until Module 12 (Chunk 05).
+async function lookupTemplateId(executor, templateCode) {
+  const result = await executor.input('code', sql.NVarChar, templateCode)
+    .query('SELECT TemplateId FROM ppm.ProjectTemplates WHERE TemplateCode = @code');
+  if (result.recordset.length === 0) {
+    const err = new Error(`Template "${templateCode}" does not exist.`);
+    err.category = 'NOT_FOUND';
+    throw err;
+  }
+  return result.recordset[0].TemplateId;
+}
+
 const DETAIL_SELECT = `
   SELECT pr.*,
          pf.PortfolioCode, pf.PortfolioName,
@@ -144,7 +159,8 @@ const DETAIL_SELECT = `
          pv.ValueCode AS ProjectPriorityCode, pv.ValueLabel AS ProjectPriorityLabel,
          sv.ValueCode AS StatusCode, sv.ValueLabel AS StatusLabel,
          hv.ValueCode AS HealthStatusCode, hv.ValueLabel AS HealthStatusLabel,
-         lc.LifecycleCode, lc.LifecycleName
+         lc.LifecycleCode, lc.LifecycleName,
+         tpl2.TemplateCode, tpl2.TemplateName
   FROM ppm.Projects pr
   JOIN ppm.Portfolios pf ON pf.PortfolioId = pr.PortfolioId
   LEFT JOIN ppm.Programs pg ON pg.ProgramId = pr.ProgramId
@@ -156,6 +172,7 @@ const DETAIL_SELECT = `
   LEFT JOIN cfg.ConfigValues sv ON sv.ConfigValueId = pr.StatusValueId
   LEFT JOIN cfg.ConfigValues hv ON hv.ConfigValueId = pr.HealthStatusValueId
   LEFT JOIN cfg.Lifecycles lc ON lc.LifecycleId = pr.LifecycleId
+  LEFT JOIN ppm.ProjectTemplates tpl2 ON tpl2.TemplateId = pr.TemplateId
 `;
 
 const SORT_COLUMNS = {
@@ -242,7 +259,7 @@ async function handleCreate(pool, request) {
   const {
     name, portfolioCode, programCode, projectManagerName,
     projectTypeCode, projectCategoryCode, projectSizeCode, projectComplexityCode, projectPriorityCode,
-    statusCode, healthStatusCode, lifecycleCode, startDate, targetEndDate, description, notes,
+    statusCode, healthStatusCode, lifecycleCode, templateCode, startDate, targetEndDate, description, notes,
   } = body || {};
 
   if (!name || !portfolioCode) {
@@ -266,6 +283,7 @@ async function handleCreate(pool, request) {
     const statusId = statusCode ? await lookupConfigValueId(new sql.Request(transaction), 'ProjectStatus', statusCode) : null;
     const healthId = healthStatusCode ? await lookupConfigValueId(new sql.Request(transaction), 'ProjectHealthStatus', healthStatusCode) : null;
     const lifecycleId = lifecycleCode ? await lookupLifecycleId(new sql.Request(transaction), lifecycleCode) : null;
+    const templateId = templateCode ? await lookupTemplateId(new sql.Request(transaction), templateCode) : null;
 
     const result = await new sql.Request(transaction)
       .input('code', sql.NVarChar, code)
@@ -281,6 +299,7 @@ async function handleCreate(pool, request) {
       .input('statusId', sql.Int, statusId)
       .input('healthId', sql.Int, healthId)
       .input('lifecycleId', sql.Int, lifecycleId)
+      .input('templateId', sql.Int, templateId)
       .input('startDate', sql.Date, startDate ?? null)
       .input('targetEndDate', sql.Date, targetEndDate ?? null)
       .input('description', sql.NVarChar, description ?? null)
@@ -289,13 +308,13 @@ async function handleCreate(pool, request) {
         INSERT INTO ppm.Projects (
           ProjectCode, ProjectName, PortfolioId, ProgramId, ProjectManagerName,
           ProjectTypeValueId, ProjectCategoryValueId, ProjectSizeValueId, ProjectComplexityValueId, ProjectPriorityValueId,
-          StatusValueId, HealthStatusValueId, LifecycleId, StartDate, TargetEndDate, Description, Notes
+          StatusValueId, HealthStatusValueId, LifecycleId, TemplateId, StartDate, TargetEndDate, Description, Notes
         )
         OUTPUT INSERTED.ProjectId
         VALUES (
           @code, @name, @pfId, @pgId, @pm,
           @typeId, @categoryId, @sizeId, @complexityId, @priorityId,
-          @statusId, @healthId, @lifecycleId, @startDate, @targetEndDate, @description, @notes
+          @statusId, @healthId, @lifecycleId, @templateId, @startDate, @targetEndDate, @description, @notes
         );
       `);
 
@@ -340,6 +359,9 @@ async function handleUpdate(pool, id, request) {
   const lifecycleId = body.lifecycleCode !== undefined
     ? (body.lifecycleCode === null ? null : await lookupLifecycleId(pool.request(), body.lifecycleCode))
     : row.LifecycleId;
+  const templateId = body.templateCode !== undefined
+    ? (body.templateCode === null ? null : await lookupTemplateId(pool.request(), body.templateCode))
+    : row.TemplateId;
 
   await pool.request()
     .input('id', sql.Int, id)
@@ -355,6 +377,7 @@ async function handleUpdate(pool, id, request) {
     .input('statusId', sql.Int, statusId)
     .input('healthId', sql.Int, healthId)
     .input('lifecycleId', sql.Int, lifecycleId)
+    .input('templateId', sql.Int, templateId)
     .input('startDate', sql.Date, body.startDate ?? row.StartDate)
     .input('targetEndDate', sql.Date, body.targetEndDate ?? row.TargetEndDate)
     .input('description', sql.NVarChar, body.description ?? row.Description)
@@ -366,7 +389,7 @@ async function handleUpdate(pool, id, request) {
           ProjectTypeValueId = @typeId, ProjectCategoryValueId = @categoryId, ProjectSizeValueId = @sizeId,
           ProjectComplexityValueId = @complexityId, ProjectPriorityValueId = @priorityId,
           StatusValueId = @statusId, HealthStatusValueId = @healthId, LifecycleId = @lifecycleId,
-          StartDate = @startDate, TargetEndDate = @targetEndDate, Description = @description,
+          TemplateId = @templateId, StartDate = @startDate, TargetEndDate = @targetEndDate, Description = @description,
           IsActive = @isActive, Notes = @notes,
           UpdatedDate = SYSUTCDATETIME(), UpdatedBy = SUSER_SNAME()
       WHERE ProjectId = @id;
