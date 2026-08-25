@@ -13,6 +13,7 @@ import ProjectsPage from './pages/ProjectsPage.jsx';
 import ProjectWorkspacePage from './pages/ProjectWorkspacePage.jsx';
 import TemplatesPage from './pages/TemplatesPage.jsx';
 import IntakePage from './pages/IntakePage.jsx';
+import ResourcesPage from './pages/ResourcesPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 // Top-level navigation, per Framework Section 87.
@@ -26,7 +27,7 @@ const NAV_ITEMS = [
   { id: 'portfolio', label: 'Portfolio', built: true },
   { id: 'programs', label: 'Programs', built: true },
   { id: 'projects', label: 'Projects', built: true },
-  { id: 'rmg', label: 'RMG / Resources', built: false },
+  { id: 'rmg', label: 'RMG / Resources', built: true }, // Chunk 06
   { id: 'financials', label: 'Financials', built: false },
   { id: 'governance', label: 'Governance', built: false },
   { id: 'audits', label: 'Audits', built: false },
@@ -76,6 +77,7 @@ export default function App() {
     }
 
     if (activeNav === 'intake') return <IntakePage />;
+    if (activeNav === 'rmg') return <ResourcesPage />;
     if (activeNav === 'portfolio') return <PortfolioPage />;
     if (activeNav === 'programs') return <ProgramPage />;
     if (activeNav === 'projects') {
