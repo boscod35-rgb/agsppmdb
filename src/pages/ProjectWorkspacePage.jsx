@@ -516,6 +516,95 @@ function SchedulePanel({ projectId }) {
   );
 }
 
+function ResourcePanel({ projectId }) {
+  const [allocations, setAllocations] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [status, setStatus] = useState('loading');
+  const [errorDetail, setErrorDetail] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [newAlloc, setNewAlloc] = useState({ resourceCode: '', plannedAllocationPercent: 100, startDate: '' });
+
+  useEffect(() => { load(); }, [projectId]);
+
+  async function load() {
+    setStatus('loading');
+    setErrorDetail('');
+    try {
+      const [aRes, rRes, sRes] = await Promise.all([
+        fetch(`/api/ppm/allocations/${projectId}`),
+        fetch('/api/ppm/resources'),
+        fetch('/api/config/values?category=AllocationStatus'),
+      ]);
+      const aData = await aRes.json();
+      const rData = await rRes.json();
+      const sData = await sRes.json();
+      if (aRes.ok && aData.success) {
+        setAllocations(aData.allocations);
+        setResources(rData.success ? rData.resources : []);
+        setStatuses(sData.success ? sData.values : []);
+        setStatus('ok');
+      } else {
+        setStatus('error'); setErrorDetail(aData.detail || aData.message || `HTTP ${aRes.status}`);
+      }
+    } catch {
+      setStatus('error'); setErrorDetail(`Could not reach /api/ppm/allocations/${projectId}.`);
+    }
+  }
+
+  async function handleAdd() {
+    if (!newAlloc.resourceCode) return;
+    setActionError('');
+    try {
+      const res = await fetch(`/api/ppm/allocations/${projectId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newAlloc, startDate: newAlloc.startDate || null }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) { setNewAlloc({ resourceCode: '', plannedAllocationPercent: 100, startDate: '' }); load(); }
+      else setActionError(data.detail || data.message || 'Could not add allocation.');
+    } catch { setActionError('Could not reach the allocations API.'); }
+  }
+
+  async function handleArchive(id) {
+    try {
+      const res = await fetch(`/api/ppm/allocations/${projectId}/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data.success) load();
+      else setActionError(data.detail || data.message || 'Could not archive allocation.');
+    } catch { setActionError('Could not reach the allocations API.'); }
+  }
+
+  if (status === 'loading') return <p>Loading resources&hellip;</p>;
+  if (status === 'error') return <div className="error-box"><strong>Could not load resources.</strong><p>{errorDetail}</p></div>;
+
+  return (
+    <div>
+      {actionError && <div className="error-box"><strong>Action failed.</strong><p>{actionError}</p></div>}
+      {allocations.map((a) => (
+        <div key={a.AllocationId} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+          <strong>{a.ResourceName}</strong> <code>{a.ResourceCode}</code> — {a.ResourceRoleLabel || '\u2014'}{' '}
+          — Planned: {a.PlannedAllocationPercent}%{a.ActualAllocationPercent != null && ` · Actual: ${a.ActualAllocationPercent}%`}{' '}
+          — {a.StatusLabel || '\u2014'}{' '}
+          <button onClick={() => handleArchive(a.AllocationId)}>Archive</button>
+        </div>
+      ))}
+      {allocations.length === 0 && <p className="placeholder-detail">No resources staffed on this project yet.</p>}
+      <div className="filter-row" style={{ marginTop: 12 }}>
+        <select value={newAlloc.resourceCode} onChange={(e) => setNewAlloc({ ...newAlloc, resourceCode: e.target.value })}>
+          <option value="">Select resource&hellip;</option>
+          {resources.map((r) => <option key={r.ResourceId} value={r.ResourceCode}>{r.ResourceName}</option>)}
+        </select>
+        <input type="number" min="0" max="100" style={{ width: 70 }} value={newAlloc.plannedAllocationPercent}
+          onChange={(e) => setNewAlloc({ ...newAlloc, plannedAllocationPercent: Number(e.target.value) })} />
+        <span style={{ fontSize: '0.85rem' }}>%</span>
+        <input type="date" value={newAlloc.startDate} onChange={(e) => setNewAlloc({ ...newAlloc, startDate: e.target.value })} />
+        <button onClick={handleAdd}>+ Add Resource</button>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectWorkspacePage({ projectId, onBack }) {
   const [project, setProject] = useState(null);
   const [modules, setModules] = useState([]);
@@ -600,13 +689,15 @@ export default function ProjectWorkspacePage({ projectId, onBack }) {
         ))}
       </nav>
 
-      <div className={['CHARTER', 'WBS', 'SCHEDULE'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
+      <div className={['CHARTER', 'WBS', 'SCHEDULE', 'RESOURCES'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
         {activeTab === 'CHARTER' ? (
           <CharterPanel projectId={projectId} />
         ) : activeTab === 'WBS' ? (
           <WbsPanel projectId={projectId} project={project} />
         ) : activeTab === 'SCHEDULE' ? (
           <SchedulePanel projectId={projectId} />
+        ) : activeTab === 'RESOURCES' ? (
+          <ResourcePanel projectId={projectId} />
         ) : activeModule ? (
           <>
             <p><strong>{activeModule.ValueLabel}</strong> hasn't been built yet.</p>
