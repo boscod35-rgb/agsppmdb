@@ -14,6 +14,7 @@ import ProjectWorkspacePage from './pages/ProjectWorkspacePage.jsx';
 import TemplatesPage from './pages/TemplatesPage.jsx';
 import IntakePage from './pages/IntakePage.jsx';
 import ResourcesPage from './pages/ResourcesPage.jsx';
+import RateCardsPage from './pages/RateCardsPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 // Top-level navigation, per Framework Section 87.
@@ -28,7 +29,7 @@ const NAV_ITEMS = [
   { id: 'programs', label: 'Programs', built: true },
   { id: 'projects', label: 'Projects', built: true },
   { id: 'rmg', label: 'RMG / Resources', built: true }, // Chunk 06
-  { id: 'financials', label: 'Financials', built: false },
+  { id: 'financials', label: 'Financials', built: true }, // Chunk 07 - Rate Card admin (Module 22)
   { id: 'governance', label: 'Governance', built: false },
   { id: 'audits', label: 'Audits', built: false },
   { id: 'reports', label: 'Reports', built: false },
@@ -78,6 +79,7 @@ export default function App() {
 
     if (activeNav === 'intake') return <IntakePage />;
     if (activeNav === 'rmg') return <ResourcesPage />;
+    if (activeNav === 'financials') return <RateCardsPage />;
     if (activeNav === 'portfolio') return <PortfolioPage />;
     if (activeNav === 'programs') return <ProgramPage />;
     if (activeNav === 'projects') {
