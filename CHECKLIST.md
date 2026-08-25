@@ -120,9 +120,10 @@ run any SQL — each migration must still be applied to `PPM_DEV` and
 | 007 | `007_portfolio_program_project.sql` | DEV, TEST | `ppm.Portfolios` + `ppm.Programs` + `ppm.Projects`; `PortfolioStatus`/`ProgramStatus`/`WorkspaceModules` config categories; Program numbering rule |
 | 008 | `008_intake_charter_templates.sql` | DEV, TEST | `ppm.ProjectTemplates` + `ppm.ProcessMatrixItems` + `ppm.ProjectIntakes` + `ppm.ProjectCharters`; `IntakeStatus`/`CharterApprovalStatus` config categories + `CHARTER` WorkspaceModules value; Intake numbering rule; `ppm.Projects.TemplateId` |
 | 009 | `009_wbs_schedule_delivery.sql` | DEV, TEST | `ppm.WbsItems` + `ppm.ScheduleTasks` + `ppm.TaskDependencies` + `ppm.Milestones` + `ppm.Deliverables`; `WbsPathType`/`TaskStatus`/`DependencyType`/`MilestoneStatus`/`DeliverableAcceptanceStatus` config categories + `WBS` WorkspaceModules value |
+| 010 | `010_resource_rmg.sql` | DEV, TEST | `ppm.Resources` + `ppm.ResourceAllocations` + `ppm.ResourceSkills`; `ResourceType`/`ResourceRole`/`AllocationStatus`/`Skill`/`SkillProficiencyLevel` config categories; Resource numbering rule |
 
-**Next migration number: 010.**
-**Current version: v0.11.0. Next logical version: v0.12.0.**
+**Next migration number: 011.**
+**Current version: v0.12.0. Next logical version: v0.13.0.**
 
 ---
 
@@ -201,8 +202,8 @@ Templates (Modules 08–11, above), and WBS + Schedule is **Chunk 05**
 
 ## CHUNK 05 — WBS, Schedule & Delivery Planning (Modules 12, 13, 14, 15)
 
-Done (v0.11.0, migration 009). Bundled together as one round per the
-stated preference above.
+Done (v0.11.0, migration 009). QA verified end-to-end on DEV + TEST.
+Bundled together as one round per the stated preference above.
 
 - [x] WBS / Breakdown Checklist (Module 12) — `ppm.WbsItems`,
       self-referencing hierarchy per project with reorder (move
@@ -227,8 +228,35 @@ D016.
 
 ## CHUNK 06 — Resource / RMG (Modules 16–20)
 
-Not started. Resource Master, Staffing & Allocation, Baseline vs
-Actual, Capacity & Utilization, Skills/Competency Matrix.
+Done (v0.12.0, migration 010). Bundled together as one round per the
+stated preference above.
+
+- [x] Resource Master (Module 16) — `ppm.Resources`, business-visible
+      `RES-#####` ID via Numbering, Administration -> RMG / Resources
+      admin page (the `rmg` nav item had sat unbuilt since the
+      application shell itself)
+- [x] Staffing & Allocation (Module 17) — `ppm.ResourceAllocations`
+      (`PlannedAllocationPercent`), project-scoped CRUD, real content
+      on the Project Workspace's Resources tab (also seeded since
+      migration 007, never used until now)
+- [x] Baseline vs Actual Resource Tracking (Module 18) — the same
+      `ppm.ResourceAllocations` table's `ActualAllocationPercent`
+      column, reconciled by editing the allocation over time — not a
+      separate snapshot/versioning mechanism (see `DECISIONS.md` D017)
+- [x] Capacity & Utilization (Module 19) — derived report
+      (`GET /api/ppm/resources/{id}/utilization`), no stored table
+      (see `DECISIONS.md` D018)
+- [x] Skills / Competency Matrix (Module 20) — `ppm.ResourceSkills`;
+      skill vocabulary and proficiency scale both reuse the
+      Configuration Engine rather than bespoke tables (see
+      `DECISIONS.md` D019)
+
+**Note on scope boundary with Chunk 07:** Resource assignment stays
+at the project level this chunk — a resource is staffed on a project
+at some percent, not yet assigned to individual Schedule Tasks.
+Task-level effort/hours (Task → Resource → Planned/Actual Effort) is
+explicitly Module 23, which the framework places in Chunk 07 (Finance,
+Rate Card & Billing) alongside Cost Management and Rate Cards.
 
 ## CHUNK 07 — Finance, Rate Card & Billing (Modules 21–25)
 
@@ -267,14 +295,15 @@ master document.
 
 ## Suggested next step
 
-**Chunk 06 — Resource / RMG (Modules 16–20)** is next, per
-`ENTERPRISE_PPM_PROJECT_SCOPE (1).md` Section 7: Resource Master,
-Staffing & Allocation, Baseline vs Actual Resource Tracking, Capacity
-& Utilization, Skills/Competency Matrix. Resource Master (16) and
-Staffing & Allocation (17) are the natural pair to start with, since
-Baseline vs Actual (18) and Capacity & Utilization (19) both need
-real allocations to compare against or aggregate. Worth deciding
-during scoping whether this round also wires resource assignment
-onto the Schedule Tasks built in Chunk 05 (a task currently has no
-assigned resource), since that's the natural connective tissue
-between the two chunks.
+**Chunk 07 — Finance, Rate Card & Billing (Modules 21–25)** is next,
+per `ENTERPRISE_PPM_PROJECT_SCOPE (1).md` Section 7: Cost Management,
+Rate Card Management, Effort Management, Billing Calculation,
+Budget/Forecast/Variance. Effort Management (Module 23) is the
+natural first piece to bundle, since it's the one that finally wires
+resources onto individual Schedule Tasks (Task → Resource → Planned/
+Actual Effort) — the connection deliberately deferred out of Chunk
+06. Cost Management (21) and Rate Cards (22) pair naturally with it,
+since effort × rate is how planned/actual cost gets computed at all.
+Billing Calculation (24) and Budget/Forecast/Variance (25) could
+either join this same round or become a tight follow-on, depending
+on how large Effort + Cost + Rate Cards turns out to be on its own.

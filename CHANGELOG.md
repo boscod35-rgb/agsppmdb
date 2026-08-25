@@ -11,6 +11,60 @@ current chunk numbering.
 
 ---
 
+## v0.12.0 — Resource / RMG (Chunk 06)
+
+**Added**
+- `ppm.Resources` (migration `010_resource_rmg.sql`) — the resource
+  master (Module 16): name, email, Business Unit, Type, Role,
+  default weekly capacity, business-visible `RES-#####` ID via the
+  same transactional Numbering pattern as every other entity (D012)
+- `ppm.ResourceAllocations` — does double duty for Modules 17
+  (Staffing & Allocation) and 18 (Baseline vs Actual): one row per
+  resource-per-project with both `PlannedAllocationPercent` and
+  `ActualAllocationPercent` columns, rather than a separate
+  snapshot/versioning table (see D017)
+- Module 19 (Capacity & Utilization) — **no new table.**
+  `GET /api/ppm/resources/{id}/utilization` computes total
+  planned/actual allocation percent across all of a resource's
+  active project allocations and flags over-allocation (>100%) on
+  demand (see D018)
+- `ppm.ResourceSkills` (Module 20) — skill + proficiency reuse the
+  Configuration Engine (new `Skill`, `SkillProficiencyLevel`
+  categories, see D019); a filtered unique index allows a removed
+  skill to be re-added later without a leftover inactive row
+  blocking it
+- New Config Engine categories: `ResourceType`, `ResourceRole`,
+  `AllocationStatus`, `Skill`, `SkillProficiencyLevel`
+- New Numbering rule: `Resource`
+- `GET/POST/PUT/DELETE /api/ppm/resources/{id?}/{sub?}/{subId?}`
+  (+ `GET /{id}/utilization`, nested `skills` sub-route)
+- `GET/POST/PUT/DELETE /api/ppm/allocations/{projectId}/{id?}`
+  (project-scoped, mirrors the milestones.js/deliverables.js pattern)
+- `src/pages/ResourcesPage.jsx` — Resource Master admin page (list/
+  create/archive, expandable rows showing utilization + skills
+  matrix); wired to the `RMG / Resources` top-level nav item that
+  had sat as an unbuilt placeholder since the application shell
+- `src/pages/ProjectWorkspacePage.jsx` — the `RESOURCES` tab (seeded
+  since migration 007, never used) now shows real content: this
+  project's staffed resources with planned/actual % and archive
+
+**Database**
+- Migration `010_resource_rmg.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+**Out of scope (documented, not a gap)**
+- Task-level effort/hours (Task → Resource → Planned/Actual Effort)
+  — Module 23, Chunk 07. This chunk's allocations stay at the
+  project level; a resource is staffed on a project at some percent,
+  not yet assigned to individual Schedule Tasks
+- Rate cards / resource cost — Chunk 07
+- A company-wide capacity dashboard — closer to Module 38
+  (Dashboard & Reporting), Chunk 11; this chunk's utilization view is
+  per-resource, not aggregated
+
+---
+
 ## v0.11.0 — WBS, Schedule & Delivery Planning (Chunk 05)
 
 **Added**

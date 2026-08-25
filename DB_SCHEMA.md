@@ -39,6 +39,7 @@ original file. (framework Section 92)
 | 007 | `007_portfolio_program_project.sql` | DEV, TEST | `ppm.Portfolios` + `ppm.Programs` + `ppm.Projects` (Modules 02/03/04); `PortfolioStatus`/`ProgramStatus`/`WorkspaceModules` config categories; Program numbering rule |
 | 008 | `008_intake_charter_templates.sql` | DEV, TEST | `ppm.ProjectTemplates` + `ppm.ProcessMatrixItems` + `ppm.ProjectIntakes` + `ppm.ProjectCharters` (Modules 08/09/10/11); `IntakeStatus`/`CharterApprovalStatus` config categories + `CHARTER` WorkspaceModules value; Intake numbering rule; adds `ppm.Projects.TemplateId` |
 | 009 | `009_wbs_schedule_delivery.sql` | DEV, TEST | `ppm.WbsItems` + `ppm.ScheduleTasks` + `ppm.TaskDependencies` + `ppm.Milestones` + `ppm.Deliverables` (Modules 12/13/14/15); `WbsPathType`/`TaskStatus`/`DependencyType`/`MilestoneStatus`/`DeliverableAcceptanceStatus` config categories + `WBS` WorkspaceModules value |
+| 010 | `010_resource_rmg.sql` | DEV, TEST | `ppm.Resources` + `ppm.ResourceAllocations` + `ppm.ResourceSkills` (Modules 16/17/18/19/20); `ResourceType`/`ResourceRole`/`AllocationStatus`/`Skill`/`SkillProficiencyLevel` config categories; Resource numbering rule |
 
 Every database independently tracks which migrations it has via its
 own `system.SchemaVersions` table — DEV and TEST each have their own
@@ -404,6 +405,59 @@ ppm.Deliverables: DeliverableId PK, ProjectId FK -> ppm.Projects (required),
 ```
 
 Full CRUD via `/api/ppm/deliverables/{projectId}/{id?}`.
+
+## ppm.Resources
+
+Chunk 06, migration `010_resource_rmg.sql`. The resource master
+(Module 16).
+
+```sql
+ppm.Resources: ResourceId PK, ResourceCode UNIQUE (Numbering-generated, RES-#####),
+  ResourceName, Email, BusinessUnitId FK -> org.BusinessUnits (nullable),
+  ResourceTypeValueId / ResourceRoleValueId FK -> cfg.ConfigValues (nullable),
+  DefaultCapacityHoursPerWeek (DECIMAL, default 40), IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD via `/api/ppm/resources/{id?}/{sub?}/{subId?}`.
+
+## ppm.ResourceAllocations
+
+Chunk 06, Modules 17 + 18 combined (see D017). One row per
+resource-per-project.
+
+```sql
+ppm.ResourceAllocations: AllocationId PK,
+  ResourceId FK -> ppm.Resources (required), ProjectId FK -> ppm.Projects (required),
+  PlannedAllocationPercent (Module 17, DECIMAL 0-100, CHECK constrained),
+  ActualAllocationPercent (Module 18, DECIMAL 0-100, nullable, CHECK constrained),
+  StartDate, EndDate, StatusValueId FK -> cfg.ConfigValues (category AllocationStatus),
+  IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+Project-scoped CRUD via `/api/ppm/allocations/{projectId}/{id?}`
+(same pattern as `milestones.js`/`deliverables.js`). Module 19
+(Capacity & Utilization) reads this table but has no table of its own
+— see D018 and the `/api/ppm/resources/{id}/utilization` endpoint in
+`API_CONTRACTS.md`.
+
+## ppm.ResourceSkills
+
+Chunk 06, Module 20. Skill vocabulary and proficiency scale both
+reuse the Configuration Engine (`Skill`, `SkillProficiencyLevel`
+categories — see D019); this is the only new table Module 20 needed.
+
+```sql
+ppm.ResourceSkills: ResourceSkillId PK, ResourceId FK -> ppm.Resources (required),
+  SkillValueId FK -> cfg.ConfigValues (category Skill, required),
+  ProficiencyLevelValueId FK -> cfg.ConfigValues (category SkillProficiencyLevel, nullable),
+  Notes, IsActive, CreatedDate/By, UpdatedDate/By
+```
+
+`UQ_ResourceSkills_ActiveSkillPerResource` is a **filtered** unique
+index (`WHERE IsActive = 1`), not a table constraint — this lets a
+removed skill be re-added later without a leftover inactive row
+blocking the new insert. Managed via the nested `skills` sub-route
+under `/api/ppm/resources/{id}/skills`.
 
 ## Credentials reference (usernames and env var names ONLY — no
 ## passwords appear in this file or anywhere in the repo)

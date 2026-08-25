@@ -574,6 +574,65 @@ code), `SCHEMA_MISSING` (500, run migration 009).
 
 ---
 
+## GET/POST/PUT/DELETE /api/ppm/resources/{id?}/{sub?}/{subId?} + GET /{id}/utilization
+
+Module 16, added in Chunk 06. GET (no id) lists all resources, each
+with a nested `skills` array. POST creates — `name` required;
+`email`, `businessUnitCode`, `resourceTypeCode`, `resourceRoleCode`,
+`defaultCapacityHoursPerWeek` (defaults to 40), `notes` optional.
+`ResourceCode` is server-generated (`RES-#####`) inside the same
+Numbering transaction pattern as every other entity. PUT/DELETE
+`{id}` update or archive.
+
+**GET `/{id}/utilization`** (Module 19 — no backing table, see
+`DECISIONS.md` D018) sums the resource's active allocations across
+all projects:
+```json
+{
+  "success": true,
+  "utilization": {
+    "resourceId": 4,
+    "defaultCapacityHoursPerWeek": 40,
+    "totalPlannedPercent": 120,
+    "totalActualPercent": 100,
+    "isOverAllocatedPlanned": true,
+    "isOverAllocatedActual": false,
+    "allocations": [ { "AllocationId": 1, "ProjectCode": "PRJ-00001", "PlannedAllocationPercent": 60, "...": "..." } ]
+  }
+}
+```
+
+**Skills sub-routes** (`sub` = `skills`, Module 20):
+- `POST /{id}/skills` — add a skill (`skillCode` required, `proficiencyCode` optional)
+- `PUT /{id}/skills/{skillId}` — update proficiency/notes
+- `DELETE /{id}/skills/{skillId}` — soft-delete (a filtered unique index lets the same skill be re-added later)
+
+**Failure:** `VALIDATION_FAILED` (400, missing `name` or `skillCode`),
+`NOT_FOUND` (404, unknown resource/skill id or referenced business
+unit/type/role/skill/proficiency code), `DUPLICATE_CODE` (500),
+`SCHEMA_MISSING` (500, run migration 010).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/allocations/{projectId}/{id?}
+
+Modules 17 + 18, added in Chunk 06. Project-scoped (mirrors
+`milestones.js`/`deliverables.js`). GET `/{projectId}` lists active
+allocations for the project, joined with Resource name/code/type/
+role. POST `/{projectId}` creates — `resourceCode` and
+`plannedAllocationPercent` (0–100) required; `actualAllocationPercent`
+(0–100), `startDate`, `endDate`, `statusCode` (defaults to `PLANNED`),
+`notes` optional. PUT `/{id}` is how Planned vs Actual gets
+reconciled over time (Module 18) — update `actualAllocationPercent`
+as real staffing plays out. DELETE `{id}` archives.
+
+**Failure:** `VALIDATION_FAILED` (400, missing `resourceCode`/
+`plannedAllocationPercent`, or a percentage outside 0–100),
+`NOT_FOUND` (404, unknown project/allocation/resource/status code),
+`SCHEMA_MISSING` (500, run migration 010).
+
+---
+
 ## Planned, not yet built
 
 - `GET /api/cmdb/azure-resources/{id}` — single record

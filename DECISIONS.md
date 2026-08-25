@@ -269,3 +269,61 @@ marking is a genuinely different UI paradigm from a dated task list.
 enough to need their own dedicated screen (e.g., a portfolio-wide
 milestone rollup), that would be a new WorkspaceModules value and a
 dedicated panel at that point, not a retrofit of this decision.
+
+---
+
+### D017 — Planned and Actual allocation live as two columns on one row, not a snapshot table
+
+Modules 17 (Staffing & Allocation) and 18 (Baseline vs Actual
+Resource Tracking) could have been built as two separate tables - a
+"planned" allocation and a versioned history of "actual" snapshots
+over time, mirroring how a dedicated Baseline Engine (mentioned in
+the framework's Chunk 07 scope for Financials/Schedule) would work.
+Chunk 06 instead put `PlannedAllocationPercent` and
+`ActualAllocationPercent` as two columns on the same
+`ppm.ResourceAllocations` row.
+
+**Status:** Deliberate, and intentionally the simpler of two valid
+approaches. A real Baseline Engine (versioned snapshots at named
+points in time - Original/Approved/Forecast/Actual) is explicitly
+framework scope for a later chunk; building a bespoke one-off
+snapshot mechanism just for resource allocation here would likely
+conflict with or duplicate that future work. If/when a general
+Baseline Engine is built, Resource Allocations should adopt it rather
+than keep its own parallel mechanism.
+
+---
+
+### D018 — Capacity & Utilization (Module 19) is a derived report, not a stored table
+
+Unlike every other module in this platform, Module 19 has no
+dedicated `ppm.*` table. `GET /api/ppm/resources/{id}/utilization`
+computes total Planned and Actual allocation percentage across a
+resource's active `ppm.ResourceAllocations` rows on every request and
+compares against 100%, rather than maintaining a cached/materialized
+utilization figure that would need to be kept in sync as allocations
+change.
+
+**Status:** Deliberate. Configure First applies to configurable
+*data* (picklists, thresholds, labels) - it does not mean every
+computed value needs a backing table. Revisit only if this
+computation becomes a real performance bottleneck at scale (250+
+projects' worth of allocations per resource is not expected to be
+slow to sum).
+
+---
+
+### D019 — Skills and Proficiency Levels reuse the Configuration Engine
+
+Module 20 (Skills/Competency Matrix) needed a skill vocabulary and a
+proficiency scale. Rather than bespoke `ppm.Skills` and
+`ppm.ProficiencyLevels` master tables, both became new
+`cfg.ConfigCategories` (`Skill`, `SkillProficiencyLevel`) - the same
+pattern already used for every other platform-wide picklist since
+Module 05. `ppm.ResourceSkills` is the only new table Module 20
+needed, as the join between a Resource and a skill/proficiency pair.
+
+**Status:** Deliberate, consistent with every prior "reuse the
+generic engine" decision (D011, D016). The skill vocabulary is
+exactly the kind of enterprise-wide configurable list Configure
+First was built for.

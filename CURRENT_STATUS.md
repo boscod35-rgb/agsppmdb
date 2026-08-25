@@ -4,9 +4,9 @@ What's actually built, right now, versus what's designed but not
 built. Update this file as part of any chunk of work — it goes stale
 fast if left for later.
 
-Last updated: reflects WBS, Schedule & Delivery Planning (v0.11.0)
-deployed to DEV and TEST (pending QA walkthrough). Chunk labels use
-the consolidated 12-chunk roadmap (`DECISIONS.md` D010).
+Last updated: reflects Resource / RMG (v0.12.0) deployed to DEV and
+TEST (pending QA walkthrough). Chunk labels use the consolidated
+12-chunk roadmap (`DECISIONS.md` D010).
 
 ## Chunk status
 
@@ -33,18 +33,24 @@ absorbed from this repo's earlier ad hoc numbering.
 | ↳ Portfolio | v0.9.0 | Done | Create/Edit/Archive, Business Unit mapping, owner, status |
 | ↳ Program | v0.9.0 | Done | Portfolio mapping, Program Manager, status |
 | ↳ Project | v0.9.0 | Done | Portfolio + optional Program mapping, PM, all Chunk 02 picklists, Lifecycle assignment, business-visible ID, server-side pagination/search/filter/sort |
-| ↳ Project Workspace Shell | v0.9.0 | Done (shell only at the time; Charter, WBS, Schedule tabs got real content later) | Nav tabs driven by WorkspaceModules config |
+| ↳ Project Workspace Shell | v0.9.0 | Done (shell only at the time; Charter, WBS, Schedule, Resources tabs got real content in later chunks) | Nav tabs driven by WorkspaceModules config |
 | **Chunk 04 — Project Intake, Charter & Templates** | v0.10.0 | **Done, QA verified end-to-end on DEV + TEST** | Modules 08, 09, 10, 11 — migration 008 |
 | ↳ Template Management | v0.10.0 | Done | `ppm.ProjectTemplates` + nested Process Matrix items, Administration -> Global Templates UI |
 | ↳ Process Matrix | v0.10.0 | Done | `ppm.ProcessMatrixItems`, ordered checklist per Template. Instantiating onto a real project's WBS shipped in Chunk 05 |
 | ↳ Project Intake | v0.10.0 | Done | `ppm.ProjectIntakes` + Convert to Project action |
 | ↳ Project Charter | v0.10.0 | Done | `ppm.ProjectCharters`, first real content in the Project Workspace shell (Charter tab) |
-| **Chunk 05 — WBS, Schedule & Delivery Planning** | v0.11.0 | **Deployed to DEV + TEST — awaiting QA walkthrough** | Modules 12, 13, 14, 15 — migration 009 |
+| **Chunk 05 — WBS, Schedule & Delivery Planning** | v0.11.0 | **Done, QA verified end-to-end on DEV + TEST** | Modules 12, 13, 14, 15 — migration 009 |
 | ↳ WBS / Breakdown Checklist | v0.11.0 | Done | `ppm.WbsItems`, hierarchy + reorder + checkbox + green/red path, own Workspace tab. Includes Generate from Template action (closes Chunk 04's deferred item) |
 | ↳ Schedule Management | v0.11.0 | Done | `ppm.ScheduleTasks` + `ppm.TaskDependencies`, real content on the Schedule tab (Tasks sub-tab) |
 | ↳ Milestone & Phase-Gate Tracking | v0.11.0 | Done | `ppm.Milestones`, ties to `cfg.LifecyclePhases`, Approve action, Schedule tab (Milestones sub-tab) |
 | ↳ Deliverables Management | v0.11.0 | Done | `ppm.Deliverables`, optional Milestone link, Schedule tab (Deliverables sub-tab) |
-| **Chunk 06 onward** | — | Not started | Modules 16–40; see master framework doc for full breakdown |
+| **Chunk 06 — Resource / RMG** | v0.12.0 | **Deployed to DEV + TEST — awaiting QA walkthrough** | Modules 16, 17, 18, 19, 20 — migration 010 |
+| ↳ Resource Master | v0.12.0 | Done | `ppm.Resources`, business-visible `RES-#####` ID, Administration -> RMG / Resources UI |
+| ↳ Staffing & Allocation | v0.12.0 | Done | `ppm.ResourceAllocations` (Planned %), real content on the Project Workspace's Resources tab |
+| ↳ Baseline vs Actual Resource Tracking | v0.12.0 | Done | Same `ppm.ResourceAllocations` table's Actual % column, reconciled via the allocation's own edit form |
+| ↳ Capacity & Utilization | v0.12.0 | Done | Derived report (`GET /api/ppm/resources/{id}/utilization`), no stored table |
+| ↳ Skills / Competency Matrix | v0.12.0 | Done | `ppm.ResourceSkills`, skill + proficiency reuse the Configuration Engine, shown on the Resource Master page |
+| **Chunk 07 onward** | — | Not started | Modules 21–40; see master framework doc for full breakdown |
 
 ## What works right now, per environment
 
@@ -79,6 +85,9 @@ absorbed from this repo's earlier ad hoc numbering.
 | `/api/ppm/milestones` (+ `/approve`) | ✓ | ✓ | — |
 | `/api/ppm/deliverables` | ✓ | ✓ | — |
 | Project Workspace WBS + Schedule tabs (real content) | ✓ | ✓ | — |
+| `/api/ppm/resources` (+ `/utilization`, nested `/skills`) | ✓ | ✓ | — |
+| `/api/ppm/allocations` | ✓ | ✓ | — |
+| RMG / Resources page, Project Workspace Resources tab | ✓ | ✓ | — |
 
 ## URLs (also recorded in `cmdb.AzureResources` — check there first,
 ## this table can go stale)
@@ -89,14 +98,18 @@ absorbed from this repo's earlier ad hoc numbering.
 
 ## What's explicitly NOT built yet
 
-- Any module 16–40 content (RMG, Financials, RAID, Governance,
-  Audit, Gap Assessment, etc.) — all show as greyed-out placeholders
-  in the shell nav; the Project Workspace's remaining tabs (Gap
-  Assessment, Resources, Financials, RAID, Governance, Audits,
-  Documents, History) are a nav shell only, no content
-- Baseline Engine (Original/Approved/Forecast/Actual snapshots) —
-  Chunk 06
-- RMG resource assignment to Schedule Tasks — Chunk 06
+- Any module 21–40 content (Financials, RAID, Governance, Audit, Gap
+  Assessment, etc.) — all show as greyed-out placeholders in the
+  shell nav; the Project Workspace's remaining tabs (Gap Assessment,
+  Financials, RAID, Governance, Audits, Documents, History) are a
+  nav shell only, no content
+- Task-level effort/hours (Task → Resource → Planned/Actual Effort,
+  Module 23) — resource allocations stay at the project level this
+  chunk, not assigned to individual Schedule Tasks yet
+- Rate cards / resource cost — Chunk 07
+- Baseline Engine (Original/Approved/Forecast/Actual snapshots for
+  Schedule/Financials) — Chunk 07 territory, distinct from the
+  Planned/Actual columns Chunk 06 added to Resource Allocations
 - Gantt-style visual scheduling — the Schedule tab is list-based
 - Lifecycle Gates (approval requirements between phases) — only the
   phase structure itself was built (Milestones can now optionally
