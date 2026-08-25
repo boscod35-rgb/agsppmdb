@@ -4,9 +4,9 @@ What's actually built, right now, versus what's designed but not
 built. Update this file as part of any chunk of work — it goes stale
 fast if left for later.
 
-Last updated: reflects Portfolio / Program / Project Core (v0.9.0)
-deployed and verified on DEV and TEST. Chunk labels use the
-consolidated 12-chunk roadmap (`DECISIONS.md` D010).
+Last updated: reflects Project Intake, Charter & Templates (v0.10.0)
+deployed to DEV and TEST (pending QA walkthrough). Chunk labels use
+the consolidated 12-chunk roadmap (`DECISIONS.md` D010).
 
 ## Chunk status
 
@@ -29,12 +29,17 @@ absorbed from this repo's earlier ad hoc numbering.
 | ↳ Numbering (Module 06) | v0.8.0 | Done | `cfg.NumberingRules` — migration 006 |
 | ↳ Lifecycle / Stage-Gate (Module 07) | v0.8.0 | Partial | Phase structure done; Lifecycle Gates (approvals between phases) not built — migration 006 |
 | ↳ Section 106 — Branding & Theme Engine | v0.8.0 | Partial | Data model + management UI done; **runtime application to the live app deferred** — its own focused round |
-| **Chunk 03 — Portfolio / Program / Project Core** | v0.9.0 | **Done** | Modules 02, 03, 04 — migration 007 |
+| **Chunk 03 — Portfolio / Program / Project Core** | v0.9.0 | **Done, QA verified end-to-end on DEV + TEST** | Modules 02, 03, 04 — migration 007 |
 | ↳ Portfolio | v0.9.0 | Done | Create/Edit/Archive, Business Unit mapping, owner, status |
 | ↳ Program | v0.9.0 | Done | Portfolio mapping, Program Manager, status |
 | ↳ Project | v0.9.0 | Done | Portfolio + optional Program mapping, PM, all Chunk 02 picklists, Lifecycle assignment, business-visible ID, server-side pagination/search/filter/sort |
-| ↳ Project Workspace Shell | v0.9.0 | Done (shell only) | Nav tabs driven by WorkspaceModules config; no tab content yet |
-| **Chunk 04 onward** | — | Not started | Modules 08–40; see master framework doc for full breakdown |
+| ↳ Project Workspace Shell | v0.9.0 | Done (shell only at the time; Charter tab got real content in Chunk 04) | Nav tabs driven by WorkspaceModules config |
+| **Chunk 04 — Project Intake, Charter & Templates** | v0.10.0 | **Deployed to DEV + TEST — awaiting QA walkthrough** | Modules 08, 09, 10, 11 — migration 008 |
+| ↳ Template Management | v0.10.0 | Done | `ppm.ProjectTemplates` + nested Process Matrix items, Administration -> Global Templates UI |
+| ↳ Process Matrix | v0.10.0 | Done | `ppm.ProcessMatrixItems`, ordered checklist per Template (config only — not yet instantiated onto a real project) |
+| ↳ Project Intake | v0.10.0 | Done | `ppm.ProjectIntakes` + Convert to Project action |
+| ↳ Project Charter | v0.10.0 | Done | `ppm.ProjectCharters`, first real content in the Project Workspace shell (Charter tab) |
+| **Chunk 05 onward** | — | Not started | Modules 12–40; see master framework doc for full breakdown |
 
 ## What works right now, per environment
 
@@ -59,7 +64,11 @@ absorbed from this repo's earlier ad hoc numbering.
 | Administration -> Project Configuration page | ✓ | ✓ | — |
 | Administration -> Organization / Numbering / Lifecycle / Branding pages | ✓ | ✓ | — |
 | Portfolio / Programs / Projects pages | ✓ | ✓ | — |
-| Project Workspace shell (nav only, no tab content) | ✓ | ✓ | — |
+| Project Workspace shell (Charter tab has real content; rest are placeholders) | ✓ | ✓ | — |
+| `/api/ppm/templates` (+ nested `/items`) | ✓ | ✓ | — |
+| `/api/ppm/intakes` (+ `/convert`) | ✓ | ✓ | — |
+| `/api/ppm/charters` (+ `/approve`) | ✓ | ✓ | — |
+| Intake page, Administration -> Global Templates page | ✓ | ✓ | — |
 
 ## URLs (also recorded in `cmdb.AzureResources` — check there first,
 ## this table can go stale)
@@ -70,10 +79,13 @@ absorbed from this repo's earlier ad hoc numbering.
 
 ## What's explicitly NOT built yet
 
-- Any module 08–40 content (WBS, Schedule, RMG, Financials, RAID,
+- Any module 12–40 content (WBS, Schedule, RMG, Financials, RAID,
   Governance, Audit, Gap Assessment, etc.) — all show as greyed-out
-  placeholders in the shell nav; the Project Workspace's own tabs
-  for these are a nav shell only, no content
+  placeholders in the shell nav; the Project Workspace's remaining
+  tabs (everything except Charter) are a nav shell only, no content
+- Instantiating a Template's Process Matrix as a real WBS checklist
+  on a specific project — the config side (Modules 08 + 11) is done;
+  the "apply it to a project" side is Module 12, Chunk 05
 - Lifecycle Gates (approval requirements between phases) — only the
   phase structure itself was built
 - Branding & Theme Engine runtime application — data model + UI are
@@ -81,7 +93,8 @@ absorbed from this repo's earlier ad hoc numbering.
   `cfg.BrandThemes` yet (deliberately deferred, its own round)
 - CMDB tabs other than Azure Info (Environments, Repositories,
   Credentials Reference, Contacts — structural placeholders only)
-- Authentication / RBAC
+- Authentication / RBAC — Charter approval currently accepts any
+  typed-in approver name, same no-auth convention as everywhere else
 - Any CI/CD gating beyond the Azure-generated GitHub Actions build
   step (no automated test suite, no PR-based gating yet)
 - PROD environment entirely

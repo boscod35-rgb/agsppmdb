@@ -394,7 +394,9 @@ Complexity, Priority, Status, Health Status) plus Lifecycle.
 `programCode`, `projectManagerName`, `projectTypeCode`,
 `projectCategoryCode`, `projectSizeCode`, `projectComplexityCode`,
 `projectPriorityCode`, `statusCode`, `healthStatusCode`,
-`lifecycleCode`, `startDate`, `targetEndDate`, `description`,
+`lifecycleCode`, `templateCode` (added Chunk 04 — which Module 08
+Template this project was created from, purely informational),
+`startDate`, `targetEndDate`, `description`,
 `notes` are all optional. `ProjectCode` is server-generated
 (EntityType = `Project`) inside the same transaction as the insert
 and every picklist code is validated against `cfg.ConfigValues`
@@ -407,6 +409,86 @@ an optional field). **DELETE** `/{id}` archives (`IsActive = 0`).
 `NOT_FOUND` (404, unknown project id, or any referenced portfolio /
 program / picklist code / lifecycle code), `DUPLICATE_CODE` (500),
 `SCHEMA_MISSING` (500, run migration 007).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/templates/{id?}/{sub?}/{subId?}
+
+Modules 08 + 11, added in Chunk 04. GET (no id) lists all templates,
+each with a nested `items` array (its Process Matrix, ordered by
+`SequenceOrder`). POST creates a template — `templateCode` (user-entered,
+unique) and `name` are required; `projectTypeCode`, `lifecycleCode`,
+`description`, `notes` are optional. PUT/DELETE `{id}` update or
+archive the template (archiving a template does not archive its items).
+
+**Process Matrix sub-routes** (`sub` = `items`):
+- `POST /{id}/items` — add an item (`itemName` required; `sequenceOrder`, `isRequired` optional)
+- `PUT /{id}/items/{itemId}` — update an item
+- `DELETE /{id}/items/{itemId}` — soft-delete an item
+
+**Success (list):** `{ success, count, templates: [{ TemplateId, TemplateCode, TemplateName, ProjectTypeLabel, LifecycleName, IsActive, items: [{ ProcessMatrixItemId, ItemName, SequenceOrder, IsRequired, IsActive }] }] }`
+
+**Failure:** `VALIDATION_FAILED` (400, missing `templateCode`/`name`
+or `itemName`), `NOT_FOUND` (404, unknown template/item id or
+referenced type/lifecycle code), `DUPLICATE_CODE` (500),
+`SCHEMA_MISSING` (500, run migration 008).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/intakes/{id?} + POST /{id}/convert
+
+Module 09, added in Chunk 04. GET (no id) lists all intakes
+(`?status=CODE` filters by `IntakeStatus`). POST creates — only
+`requestTitle` is required; `businessNeed`, `sponsorName`,
+`requestedByName`, `businessUnitCode`, `projectTypeCode`,
+`projectCategoryCode`, `priorityCode`, `templateCode`, `statusCode`
+(defaults to `SUBMITTED`), `requestedDate`, `description`, `notes`
+are all optional. `IntakeCode` is server-generated (`INT-#####`).
+PUT `{id}` updates any field — **fails once the intake has been
+converted** (`ProjectId` is set); edit the resulting Project instead.
+DELETE `{id}` archives.
+
+**POST `/{id}/convert`** — turns this intake into a real project.
+Body: `{ portfolioCode (required), programCode?, projectName?, projectManagerName? }`.
+Creates a `ppm.Projects` row using the same atomic Numbering
+increment as `POST /api/ppm/projects` (EntityType `Project`),
+copying the intake's Type/Category/Priority/Template forward (see
+`DECISIONS.md` D014), then stamps the intake `StatusValueId =
+CONVERTED` and sets `ProjectId` to the new project. Fails with
+`ALREADY_CONVERTED` if run twice on the same intake.
+
+**Success (convert):** `{ success, intake: { ..., ProjectId, StatusCode: "CONVERTED", ConvertedProjectCode: "PRJ-00007" } }`
+
+**Failure:** `VALIDATION_FAILED` (400, missing `requestTitle` on
+create or `portfolioCode` on convert, or editing an already-converted
+intake), `NOT_FOUND` (404, unknown intake/portfolio/program/type/
+category/priority/template code), `ALREADY_CONVERTED` (400),
+`DUPLICATE_CODE` (500), `SCHEMA_MISSING` (500, run migration 008).
+
+---
+
+## GET/POST/PUT /api/ppm/charters/{projectId} + POST /{projectId}/approve
+
+Module 10, added in Chunk 04. Addressed by `ProjectId`, not its own
+id — there is exactly one charter per project (`UNIQUE` constraint).
+
+GET `/{projectId}` returns the charter, or 404 `NOT_FOUND` if none
+has been created yet (this is expected, not an error state — the UI
+shows a "Create Charter" prompt on 404). POST `/{projectId}` creates
+the charter (fails with `ALREADY_EXISTS` if one already exists — use
+PUT instead); all fields (`objectives`, `scope`, `assumptions`,
+`constraints`, `businessCase`, `notes`) are optional free text.
+`ApprovalStatusValueId` defaults to `DRAFT`. PUT `/{projectId}`
+updates any field, including `approvalStatusCode` directly if needed.
+
+**POST `/{projectId}/approve`** — sets `ApprovalStatusValueId` to
+`APPROVED`, stamps `ApprovedDate` to now, and `ApprovedByName` from
+the request body (`{ approvedByName }`) — free text, since no auth
+system exists yet.
+
+**Failure:** `NOT_FOUND` (404, no charter yet, or unknown project),
+`ALREADY_EXISTS` (400, POST when a charter already exists),
+`SCHEMA_MISSING` (500, run migration 008).
 
 ---
 

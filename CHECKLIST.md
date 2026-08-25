@@ -118,9 +118,10 @@ run any SQL — each migration must still be applied to `PPM_DEV` and
 | 005 | `005_organization.sql` | DEV, TEST | `org.BusinessUnits` + `org.Departments` + `org.Locations` |
 | 006 | `006_numbering_lifecycle_branding.sql` | DEV, TEST | `cfg.NumberingRules` + `cfg.Lifecycles`/`cfg.LifecyclePhases` + `cfg.BrandThemes` |
 | 007 | `007_portfolio_program_project.sql` | DEV, TEST | `ppm.Portfolios` + `ppm.Programs` + `ppm.Projects`; `PortfolioStatus`/`ProgramStatus`/`WorkspaceModules` config categories; Program numbering rule |
+| 008 | `008_intake_charter_templates.sql` | DEV, TEST | `ppm.ProjectTemplates` + `ppm.ProcessMatrixItems` + `ppm.ProjectIntakes` + `ppm.ProjectCharters`; `IntakeStatus`/`CharterApprovalStatus` config categories + `CHARTER` WorkspaceModules value; Intake numbering rule; `ppm.Projects.TemplateId` |
 
-**Next migration number: 008.**
-**Current version: v0.9.0. Next logical version: v0.10.0.**
+**Next migration number: 009.**
+**Current version: v0.10.0. Next logical version: v0.11.0.**
 
 ---
 
@@ -170,63 +171,96 @@ stated preference above.
       modules are enabled (WorkspaceModules config category), no
       module content yet
 
-## CHUNK 04 onward — Modules 08–40
+## CHUNK 04 — Project Intake, Charter & Templates (Modules 08, 09, 10, 11)
 
-Not itemized in this checklist — re-read
-`ENTERPRISE_PPM_PROJECT_SCOPE (1).md` for the full breakdown before
-scoping these. Known from the original framework document (broader
-strokes, not the consolidated chunk numbers):
+Done (v0.10.0, migration 008). Bundled together as one round per the
+stated preference above.
 
-- [ ] WBS Core
-- [ ] Schedule Core (Tasks, Milestones, dependencies)
-- [ ] Baseline Engine (Original/Approved/Forecast/Actual, snapshots)
-- [ ] RMG — Resource Directory, Staffing & Allocation, FTE variance
-- [ ] Effort Integration (Task → Resource → Planned/Actual Effort)
-- [ ] Financial Core (Budget/Forecast/Actual/Variance)
-- [ ] Resource Cost (Hours × Rate)
-- [ ] Commercial & Billing Engine
-- [ ] RAID Core (Risk/Issue/Action/Assumption/Decision/Dependency)
-- [ ] Cross-Project Dependencies
-- [ ] Gap Assessment module (8 pillars, configurable)
-- [ ] Health Engine (weighted, only enabled modules participate)
-- [ ] Health Override (with reason/user/timestamp)
-- [ ] Governance (Stage Gates, Approvals, Exceptions)
-- [ ] Change Control (Request → Impact → Approval → Baseline Update)
-- [ ] Audit Engine (Templates, Schedule, Findings, Closure)
-- [ ] 360 Assessment (lightweight)
-- [ ] Notifications
-- [ ] Document Metadata
-- [ ] Audit Trail wiring (system.AuditLog exists but nothing writes
-      to it yet)
-- [ ] Project Metrics Contract (standardized per-project metrics API)
-- [ ] Program Roll-Up
-- [ ] Portfolio Roll-Up
-- [ ] Executive Dashboard
-- [ ] Security / Entra ID / RBAC
-- [ ] Benefits & Closure (Lessons Learned, Handover, PIR, Archive)
-- [ ] Bulk Import / Onboarding (Excel/CSV, for the 250+ existing
-      projects mentioned in the framework's scope)
-- [ ] Integration Foundation (API contracts for Power BI, ServiceNow,
-      Jira, Azure DevOps, HR, ERP, Timesheets, Teams, SharePoint)
-- [ ] Branding & Theme Engine — runtime application (carried forward
-      from Chunk 02, see above)
-- [ ] PROD environment (carried forward from Chunk 01, see above)
-- [ ] Automated regression test suite / CI gating (currently manual)
-- [ ] GitHub Actions automation for running migrations against DEV/
-      TEST automatically (currently manual via Query Editor —
-      explicitly identified as a real gap, not yet scoped)
+- [x] Template Management (Module 08) — `ppm.ProjectTemplates`,
+      Create/Edit/Archive under Administration -> Global Templates
+- [x] Process Matrix (Module 11) — `ppm.ProcessMatrixItems`, ordered
+      checklist nested under each Template. **Config only** — does
+      not yet instantiate onto a real project (that's Module 12,
+      Chunk 05)
+- [x] Project Intake (Module 09) — `ppm.ProjectIntakes`,
+      Create/Edit/Archive, plus a Convert to Project action that
+      creates a real Project via the same Numbering pattern as
+      direct project creation
+- [x] Project Charter (Module 10) — `ppm.ProjectCharters`, one per
+      Project, surfaced as the first real-content tab in the Project
+      Workspace shell (Objectives/Scope/Assumptions/Constraints/
+      Business Case, plus an Approve action)
+
+**Note on this checklist's earlier Chunk 04 entry:** a prior version
+of this file (and an earlier round of this project's own guidance)
+mislabeled WBS + Schedule as "Chunk 04." Re-reading
+`ENTERPRISE_PPM_PROJECT_SCOPE (1).md` Section 7 directly confirmed
+the master document's actual numbering: Chunk 04 is Intake/Charter/
+Templates (Modules 08–11, above), and WBS + Schedule is **Chunk 05**
+(Modules 12–15, below). This file now matches the master document.
+
+## CHUNK 05 — WBS, Schedule & Delivery Planning (Modules 12, 13, 14, 15)
+
+Not started. Per the master scope document: WBS breakdown (add
+item, reorder/move up-down, completion checkbox, green/red path),
+schedule (phases, tasks, dates, dependencies), milestones/phase
+gates, deliverables. This is also where a Template's Process Matrix
+(built in Chunk 04) would first get instantiated onto a real
+project's WBS — worth deciding during scoping whether that's in this
+chunk or its own follow-on.
+
+- [ ] WBS / Breakdown Checklist (Module 12)
+- [ ] Schedule Management (Module 13)
+- [ ] Milestone & Phase-Gate Tracking (Module 14)
+- [ ] Deliverables Management (Module 15)
+
+## CHUNK 06 — Resource / RMG (Modules 16–20)
+
+Not started. Resource Master, Staffing & Allocation, Baseline vs
+Actual, Capacity & Utilization, Skills/Competency Matrix.
+
+## CHUNK 07 — Finance, Rate Card & Billing (Modules 21–25)
+
+Not started. Cost Management, Rate Card Management, Effort
+Management, Billing Calculation, Budget/Forecast/Variance.
+
+## CHUNK 08 — RAID & Action Controls (Modules 26–30)
+
+Not started. Risk, Issue, Dependency, Assumption, Action Item
+management with aging/ownership/escalation and roll-ups.
+
+## CHUNK 09 — Assessment & Gap Management (Modules 31, 32, 35)
+
+Not started. 360 Assessment, Gap Assessment (8 pillars ->
+sub-areas -> questions -> findings -> corrective action),
+Corrective Action/CAPA.
+
+## CHUNK 10 — Audit, Compliance & Governance (Modules 33, 34, 36)
+
+Not started. Project Audit workflow, Compliance Tracking, Governance/
+Review Management.
+
+## CHUNK 11 — Documents, Notifications & Reporting (Modules 37–39)
+
+Not started. Document Library, Dashboard & Reporting (project/
+program/portfolio/enterprise), Notifications & Reminders.
+
+## CHUNK 12 — Enterprise Controls, AI & Production Readiness (Module 40 + cross-cutting)
+
+Not started. RBAC, security hardening, audit trail wiring, AI
+assistant integration, end-to-end/regression testing, PROD
+readiness, and all cross-cutting capabilities from Section 5 of the
+master document.
 
 ---
 
 ## Suggested next step
 
-**Chunk 04 onward (Modules 08–40)** is next. Re-read
-`ENTERPRISE_PPM_PROJECT_SCOPE (1).md` before scoping it in detail —
-this checklist doesn't itemize it verbatim. The natural starting
-point is **WBS Core + Schedule Core (Tasks, Milestones,
-dependencies)**, since those are the first modules that plug into
-the Project Workspace Shell's tabs (built as an empty shell in
-Chunk 03) and everything downstream (Baseline Engine, RMG effort
-integration, Financials) depends on a schedule existing first.
-Given the stated preference to bundle, WBS + Schedule Core could
-reasonably go together in one round, same pattern as Chunks 02 and 03.
+**Chunk 05 — WBS, Schedule & Delivery Planning (Modules 12–15)** is
+next, per `ENTERPRISE_PPM_PROJECT_SCOPE (1).md` Section 7. WBS
+(Module 12) and Schedule (Module 13) are the natural pair to bundle
+first, since Milestone/Phase-Gate Tracking (14) and Deliverables (15)
+both attach to items created by those two. Worth deciding during
+scoping whether this round also instantiates a Template's Process
+Matrix (built in Chunk 04) onto a project's WBS, or whether that
+stays a separate follow-on.

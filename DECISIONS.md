@@ -198,3 +198,38 @@ can never race another concurrent create onto the same code.
 Numbering rules from migration 006) get their own tables in a later
 chunk, they should follow this same transactional-increment pattern
 rather than the old non-incrementing preview-only approach.
+
+---
+
+### D013 — Charter is the first Project Workspace tab to get real content
+
+The Project Workspace shell (Chunk 03) was built with every tab as a
+placeholder, keyed off the `WorkspaceModules` config category (D011).
+Chunk 04 needed somewhere for Module 10 (Project Charter) to live,
+and rather than bolt it onto the Overview panel's field list, a new
+`CHARTER` value was added to the existing `WorkspaceModules` category
+and `ProjectWorkspacePage.jsx` now special-cases that one tab to
+render a real `CharterPanel` component instead of the generic
+placeholder block. Every other tab is untouched.
+
+**Status:** Deliberate. Establishes the pattern for future chunks:
+as each module gets built, its workspace tab flips from the generic
+placeholder branch to real content, one `WorkspaceModules` value at
+a time, without needing to touch the tab list itself.
+
+---
+
+### D014 — Intake conversion copies fields forward instead of referencing the intake live
+
+`POST /api/ppm/intakes/{id}/convert` copies the intake's Project
+Type, Category, Priority, and Template onto the newly created
+`ppm.Projects` row at conversion time, rather than having the
+Project point back at the Intake for those values. Once converted,
+the Project is fully independent — editing it later never touches
+the (now read-only) Intake record, and vice versa.
+
+**Status:** Deliberate. An Intake is a request; a Project is the
+thing that request became. Keeping them as two independent rows
+linked only by `ProjectIntakes.ProjectId` (one-directional) avoids
+ambiguity about which record is authoritative for a field after
+conversion.

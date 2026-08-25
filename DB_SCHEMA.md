@@ -37,6 +37,7 @@ original file. (framework Section 92)
 | 005 | `005_organization.sql` | DEV, TEST | `org.BusinessUnits` + `org.Departments` + `org.Locations` + seed data (Module 01) |
 | 006 | `006_numbering_lifecycle_branding.sql` | DEV, TEST | `cfg.NumberingRules` (Module 06) + `cfg.Lifecycles`/`cfg.LifecyclePhases` (Module 07) + `cfg.BrandThemes` (Section 106, data model only) |
 | 007 | `007_portfolio_program_project.sql` | DEV, TEST | `ppm.Portfolios` + `ppm.Programs` + `ppm.Projects` (Modules 02/03/04); `PortfolioStatus`/`ProgramStatus`/`WorkspaceModules` config categories; Program numbering rule |
+| 008 | `008_intake_charter_templates.sql` | DEV, TEST | `ppm.ProjectTemplates` + `ppm.ProcessMatrixItems` + `ppm.ProjectIntakes` + `ppm.ProjectCharters` (Modules 08/09/10/11); `IntakeStatus`/`CharterApprovalStatus` config categories + `CHARTER` WorkspaceModules value; Intake numbering rule; adds `ppm.Projects.TemplateId` |
 
 Every database independently tracks which migrations it has via its
 own `system.SchemaVersions` table — DEV and TEST each have their own
@@ -254,6 +255,77 @@ requirement. Full CRUD + paginated list via `/api/ppm/portfolios`,
 `/api/ppm/programs`, `/api/ppm/projects` (see `API_CONTRACTS.md`).
 "Archive" is the UI label for the same `IsActive = 0` soft-delete
 convention used everywhere else in this codebase.
+
+## ppm.ProjectTemplates / ppm.ProcessMatrixItems
+
+Chunk 04, migration `008_intake_charter_templates.sql`. Same
+nested-items pattern as `cfg.Lifecycles`/`LifecyclePhases`.
+
+```sql
+ppm.ProjectTemplates:    TemplateId PK, TemplateCode UNIQUE (user-entered, not Numbering-generated),
+  TemplateName, ProjectTypeValueId FK -> cfg.ConfigValues (nullable),
+  LifecycleId FK -> cfg.Lifecycles (nullable), Description, IsActive,
+  Notes, CreatedDate/By, UpdatedDate/By
+
+ppm.ProcessMatrixItems: ProcessMatrixItemId PK, TemplateId FK -> ppm.ProjectTemplates (required),
+  ItemName, SequenceOrder, IsRequired, IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD via `/api/ppm/templates/{id?}/{sub?}/{subId?}` (`sub` =
+`items` for the nested Process Matrix). Configuration only — nothing
+yet instantiates a template's items as a real WBS checklist on a
+project (Module 12, Chunk 05).
+
+## ppm.ProjectIntakes
+
+Chunk 04, Module 09. Pre-project requests — `IntakeCode` is
+Numbering-generated (`INT-#####`), same transactional pattern as
+Portfolio/Program/Project (D012).
+
+```sql
+ppm.ProjectIntakes: IntakeId PK, IntakeCode UNIQUE, RequestTitle,
+  BusinessNeed, SponsorName, RequestedByName,
+  BusinessUnitId FK -> org.BusinessUnits (nullable),
+  ProjectTypeValueId / ProjectCategoryValueId / PriorityValueId FK -> cfg.ConfigValues (all nullable),
+  TemplateId FK -> ppm.ProjectTemplates (nullable),
+  StatusValueId FK -> cfg.ConfigValues, category IntakeStatus,
+  RequestedDate, ProjectId FK -> ppm.Projects (nullable - set on Convert),
+  Description, IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD via `/api/ppm/intakes/{id?}`. An intake becomes read-only
+for PUT once `ProjectId` is set (converted). `POST /{id}/convert`
+creates a real `ppm.Projects` row (see D014 — fields are copied
+forward, not referenced live) using the same atomic Numbering
+increment as `POST /api/ppm/projects`.
+
+## ppm.ProjectCharters
+
+Chunk 04, Module 10. One charter per project (`UNIQUE` on
+`ProjectId`) — the first Project Workspace tab with real content
+(see D013).
+
+```sql
+ppm.ProjectCharters: CharterId PK, ProjectId FK -> ppm.Projects UNIQUE,
+  Objectives, [Scope], Assumptions, Constraints, BusinessCase,
+  ApprovalStatusValueId FK -> cfg.ConfigValues (category CharterApprovalStatus),
+  ApprovedByName, ApprovedDate, IsActive, Notes, CreatedDate/By, UpdatedDate/By
+```
+
+Addressed by `ProjectId`, not its own id: `GET/POST/PUT
+/api/ppm/charters/{projectId}` + `POST /{projectId}/approve` (stamps
+`ApprovedByName`/`ApprovedDate`, sets status to `APPROVED`). No auth
+system exists yet, so `approvedByName` is free text supplied by
+whoever clicks Approve — same convention as every other "who did
+this" field in the platform.
+
+## ppm.Projects.TemplateId (added in migration 008)
+
+Nullable `INT` FK to `ppm.ProjectTemplates`, added via `ALTER TABLE`
+on the already-applied `ppm.Projects` table (migration 007 itself
+was not edited — this is a new migration adding to it, per
+`CLAUDE.md` rule 3). Purely a record of which template a project
+came from; does not drive any automatic checklist generation yet.
 
 ## Credentials reference (usernames and env var names ONLY — no
 ## passwords appear in this file or anywhere in the repo)

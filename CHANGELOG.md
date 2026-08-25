@@ -11,6 +11,60 @@ current chunk numbering.
 
 ---
 
+## v0.10.0 — Project Intake, Charter & Templates (Chunk 04)
+
+**Added**
+- `ppm.ProjectTemplates` + `ppm.ProcessMatrixItems` (migration
+  `008_intake_charter_templates.sql`) — templates own an ordered
+  Process Matrix checklist, same nested-items pattern as
+  `cfg.Lifecycles`/`LifecyclePhases`
+- `ppm.ProjectIntakes` — pre-project requests with a **Convert to
+  Project** action (`POST /api/ppm/intakes/{id}/convert`) that
+  creates a real `ppm.Projects` row using the same transactional
+  Numbering pattern as direct project creation (D012); carries
+  forward the intake's Type/Category/Priority/Template onto the new
+  project and stamps the intake `CONVERTED`
+- `ppm.ProjectCharters` — one per Project (`UNIQUE` on `ProjectId`);
+  the first Project Workspace tab to get real content instead of a
+  placeholder (Objectives/Scope/Assumptions/Constraints/Business
+  Case, plus an Approve action)
+- `cfg.ConfigCategories`/`Values` additions: `IntakeStatus`,
+  `CharterApprovalStatus`, and one new `WorkspaceModules` value
+  (`CHARTER`) — same reuse-the-generic-engine approach as D011
+- `cfg.NumberingRules` — added the missing `Intake` rule (`Portfolio`,
+  `Program`, `Project` rules already existed)
+- `ppm.Projects.TemplateId` (nullable) — additive column recording
+  which template a project was created from; **does not** instantiate
+  the template's Process Matrix as an actual WBS checklist on the
+  project — that's Module 12 (WBS), Chunk 05
+- `GET/POST/PUT/DELETE /api/ppm/templates/{id?}/{sub?}/{subId?}`
+  (`sub`/`subId` = nested `items` sub-route for Process Matrix items)
+- `GET/POST/PUT/DELETE /api/ppm/intakes/{id?}` + `POST /{id}/convert`
+- `GET/POST/PUT /api/ppm/charters/{projectId}` + `POST /{projectId}/approve`
+- `POST/PUT /api/ppm/projects` gained an optional `templateCode` field
+- `src/pages/TemplatesPage.jsx` — list/create/archive templates with
+  an inline Process Matrix item editor
+- `src/pages/IntakePage.jsx` — list/create/archive intakes with a
+  Convert-to-Project panel
+- `src/pages/ProjectWorkspacePage.jsx` — Charter tab now renders a
+  real `CharterPanel` (view/edit/approve) instead of a placeholder;
+  every other tab is unchanged
+- `src/App.jsx` — new `Intake` top-level nav item; `Global Templates`
+  under Administration flipped from placeholder to built
+
+**Database**
+- Migration `008_intake_charter_templates.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+**Out of scope (documented, not a gap)**
+- Generating a real WBS checklist from a Template's Process Matrix
+  onto a specific project — Module 12, Chunk 05
+- RBAC-gated Charter approval (anyone can currently approve; there is
+  no auth system yet, consistent with every other module)
+
+---
+
 ## v0.9.0 — Portfolio / Program / Project Core (Chunk 03)
 
 **Added**
