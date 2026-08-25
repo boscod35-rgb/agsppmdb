@@ -269,6 +269,7 @@ function SchedulePanel({ projectId }) {
   const [tasks, setTasks] = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [deliverables, setDeliverables] = useState([]);
+  const [resources, setResources] = useState([]);
   const [statuses, setStatuses] = useState({ task: [], milestone: [], acceptance: [], dependencyType: [] });
   const [status, setStatus] = useState('loading');
   const [errorDetail, setErrorDetail] = useState('');
@@ -278,6 +279,8 @@ function SchedulePanel({ projectId }) {
   const [newDeliverable, setNewDeliverable] = useState({ deliverableName: '', ownerName: '', plannedDate: '' });
   const [depFormTaskId, setDepFormTaskId] = useState(null);
   const [depTarget, setDepTarget] = useState('');
+  const [effortFormTaskId, setEffortFormTaskId] = useState(null);
+  const [newEffort, setNewEffort] = useState({ resourceCode: '', plannedHours: 0 });
 
   useEffect(() => { load(); }, [projectId]);
 
@@ -285,10 +288,11 @@ function SchedulePanel({ projectId }) {
     setStatus('loading');
     setErrorDetail('');
     try {
-      const [tRes, mRes, dRes, tsRes, msRes, asRes, dtRes] = await Promise.all([
+      const [tRes, mRes, dRes, rRes, tsRes, msRes, asRes, dtRes] = await Promise.all([
         fetch(`/api/ppm/schedule/tasks/${projectId}`),
         fetch(`/api/ppm/milestones/${projectId}`),
         fetch(`/api/ppm/deliverables/${projectId}`),
+        fetch('/api/ppm/resources'),
         fetch('/api/config/values?category=TaskStatus'),
         fetch('/api/config/values?category=MilestoneStatus'),
         fetch('/api/config/values?category=DeliverableAcceptanceStatus'),
@@ -297,10 +301,12 @@ function SchedulePanel({ projectId }) {
       const tData = await tRes.json();
       const mData = await mRes.json();
       const dData = await dRes.json();
+      const rData = await rRes.json();
       if (tRes.ok && tData.success && mRes.ok && mData.success && dRes.ok && dData.success) {
         setTasks(tData.tasks);
         setMilestones(mData.milestones);
         setDeliverables(dData.deliverables);
+        setResources(rData.success ? rData.resources : []);
         setStatuses({
           task: (await tsRes.json()).values || [],
           milestone: (await msRes.json()).values || [],
@@ -314,6 +320,42 @@ function SchedulePanel({ projectId }) {
     } catch {
       setStatus('error'); setErrorDetail('Could not reach the schedule APIs.');
     }
+  }
+
+  async function handleAddEffort(taskId) {
+    if (!newEffort.resourceCode) return;
+    setActionError('');
+    try {
+      const res = await fetch(`/api/ppm/schedule/tasks/${projectId}/${taskId}/effort`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newEffort),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) { setEffortFormTaskId(null); setNewEffort({ resourceCode: '', plannedHours: 0 }); load(); }
+      else setActionError(data.detail || data.message || 'Could not add effort entry.');
+    } catch { setActionError('Could not reach the schedule API.'); }
+  }
+
+  async function handleUpdateEffortActual(taskId, effortId, actualHours) {
+    setActionError('');
+    try {
+      const res = await fetch(`/api/ppm/schedule/tasks/${projectId}/${taskId}/effort/${effortId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actualHours: Number(actualHours) }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) load();
+      else setActionError(data.detail || data.message || 'Could not update effort entry.');
+    } catch { setActionError('Could not reach the schedule API.'); }
+  }
+
+  async function handleRemoveEffort(taskId, effortId) {
+    try {
+      const res = await fetch(`/api/ppm/schedule/tasks/${projectId}/${taskId}/effort/${effortId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data.success) load();
+      else setActionError(data.detail || data.message || 'Could not remove effort entry.');
+    } catch { setActionError('Could not reach the schedule API.'); }
   }
 
   async function handleAddTask() {
@@ -458,6 +500,34 @@ function SchedulePanel({ projectId }) {
                     {tasks.filter((o) => o.ScheduleTaskId !== t.ScheduleTaskId).map((o) => <option key={o.ScheduleTaskId} value={o.ScheduleTaskId}>{o.TaskName}</option>)}
                   </select>{' '}
                   <button onClick={() => handleAddDependency(t.ScheduleTaskId)}>Link</button>
+                </div>
+              )}
+
+              <button onClick={() => setEffortFormTaskId(effortFormTaskId === t.ScheduleTaskId ? null : t.ScheduleTaskId)} style={{ marginTop: 4 }}>+ Effort</button>
+              {t.effort?.length > 0 && (
+                <ul style={{ margin: '4px 0 0 16px', fontSize: '0.85rem' }}>
+                  {t.effort.map((e) => (
+                    <li key={e.EffortId}>
+                      {e.ResourceName} — Planned: {e.PlannedHours}h — Actual:{' '}
+                      <input
+                        type="number" min="0" step="0.5" style={{ width: 60 }}
+                        defaultValue={e.ActualHours ?? ''}
+                        onBlur={(ev) => ev.target.value !== '' && handleUpdateEffortActual(t.ScheduleTaskId, e.EffortId, ev.target.value)}
+                      />h{e.RateCardCode ? ` — Rate: ${e.RateCardCode}` : ''}{' '}
+                      <button onClick={() => handleRemoveEffort(t.ScheduleTaskId, e.EffortId)}>Remove</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {effortFormTaskId === t.ScheduleTaskId && (
+                <div style={{ marginTop: 4 }}>
+                  <select value={newEffort.resourceCode} onChange={(e) => setNewEffort({ ...newEffort, resourceCode: e.target.value })}>
+                    <option value="">Resource&hellip;</option>
+                    {resources.map((r) => <option key={r.ResourceId} value={r.ResourceCode}>{r.ResourceName}</option>)}
+                  </select>{' '}
+                  <input type="number" min="0" step="0.5" style={{ width: 70 }} placeholder="Planned hrs"
+                    value={newEffort.plannedHours} onChange={(e) => setNewEffort({ ...newEffort, plannedHours: Number(e.target.value) })} />{' '}
+                  <button onClick={() => handleAddEffort(t.ScheduleTaskId)}>Add</button>
                 </div>
               )}
             </div>
@@ -605,6 +675,103 @@ function ResourcePanel({ projectId }) {
   );
 }
 
+function FinancialsPanel({ projectId }) {
+  const [budget, setBudget] = useState(null);
+  const [computed, setComputed] = useState(null);
+  const [status, setStatus] = useState('loading');
+  const [errorDetail, setErrorDetail] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(null);
+
+  useEffect(() => { load(); }, [projectId]);
+
+  async function load() {
+    setStatus('loading');
+    setErrorDetail('');
+    try {
+      const res = await fetch(`/api/ppm/budgets/${projectId}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBudget(data.budget);
+        setComputed(data.computed);
+        setStatus('ok');
+      } else {
+        setStatus('error'); setErrorDetail(data.detail || data.message || `HTTP ${res.status}`);
+      }
+    } catch {
+      setStatus('error'); setErrorDetail(`Could not reach /api/ppm/budgets/${projectId}.`);
+    }
+  }
+
+  function startEdit() {
+    setForm({
+      budgetAmount: budget?.BudgetAmount ?? '',
+      plannedCost: budget?.PlannedCost ?? '',
+      forecastCost: budget?.ForecastCost ?? '',
+    });
+    setEditing(true);
+    setActionError('');
+  }
+
+  async function handleSave() {
+    setActionError('');
+    try {
+      const method = budget ? 'PUT' : 'POST';
+      const payload = {
+        budgetAmount: form.budgetAmount === '' ? null : Number(form.budgetAmount),
+        plannedCost: form.plannedCost === '' ? null : Number(form.plannedCost),
+        forecastCost: form.forecastCost === '' ? null : Number(form.forecastCost),
+      };
+      const res = await fetch(`/api/ppm/budgets/${projectId}`, {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) { setEditing(false); load(); }
+      else setActionError(data.detail || data.message || 'Could not save budget.');
+    } catch { setActionError('Could not reach /api/ppm/budgets.'); }
+  }
+
+  if (status === 'loading') return <p>Loading financials&hellip;</p>;
+  if (status === 'error') return <div className="error-box"><strong>Could not load financials.</strong><p>{errorDetail}</p></div>;
+
+  const fmt = (n) => n == null ? '\u2014' : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  if (editing) {
+    return (
+      <div>
+        {actionError && <div className="error-box"><strong>Action failed.</strong><p>{actionError}</p></div>}
+        <dl>
+          <dt>Budget Amount</dt><dd><input type="number" step="0.01" value={form.budgetAmount} onChange={(e) => setForm({ ...form, budgetAmount: e.target.value })} /></dd>
+          <dt>Planned Cost</dt><dd><input type="number" step="0.01" value={form.plannedCost} onChange={(e) => setForm({ ...form, plannedCost: e.target.value })} /></dd>
+          <dt>Forecast Cost (ETC)</dt><dd><input type="number" step="0.01" value={form.forecastCost} onChange={(e) => setForm({ ...form, forecastCost: e.target.value })} /></dd>
+        </dl>
+        <button onClick={handleSave}>Save</button>{' '}
+        <button onClick={() => setEditing(false)}>Cancel</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {actionError && <div className="error-box"><strong>Action failed.</strong><p>{actionError}</p></div>}
+      <dl>
+        <dt>Budget Amount</dt><dd>{fmt(budget?.BudgetAmount)}</dd>
+        <dt>Planned Cost</dt><dd>{fmt(budget?.PlannedCost)}</dd>
+        <dt>Forecast Cost (ETC)</dt><dd>{fmt(budget?.ForecastCost)}</dd>
+        <dt>Actual Cost <span className="placeholder-detail">(computed from effort)</span></dt><dd>{fmt(computed.actualCost)}</dd>
+        <dt>Actual Billable <span className="placeholder-detail">(computed from effort)</span></dt><dd>{fmt(computed.actualBillable)}</dd>
+        <dt>Estimate at Completion (EAC)</dt><dd>{fmt(computed.estimateAtCompletion)}</dd>
+        <dt>Variance</dt><dd>{fmt(computed.variance)}</dd>
+      </dl>
+      {computed.unresolvedActualHours > 0 && (
+        <p className="placeholder-detail">{computed.unresolvedActualHours}h of actual effort has no matching Rate Card and isn't counted in Actual Cost above.</p>
+      )}
+      <button onClick={startEdit}>{budget ? 'Edit' : 'Set Budget'}</button>
+    </div>
+  );
+}
+
 export default function ProjectWorkspacePage({ projectId, onBack }) {
   const [project, setProject] = useState(null);
   const [modules, setModules] = useState([]);
@@ -689,7 +856,7 @@ export default function ProjectWorkspacePage({ projectId, onBack }) {
         ))}
       </nav>
 
-      <div className={['CHARTER', 'WBS', 'SCHEDULE', 'RESOURCES'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
+      <div className={['CHARTER', 'WBS', 'SCHEDULE', 'RESOURCES', 'FINANCIALS'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
         {activeTab === 'CHARTER' ? (
           <CharterPanel projectId={projectId} />
         ) : activeTab === 'WBS' ? (
@@ -698,6 +865,8 @@ export default function ProjectWorkspacePage({ projectId, onBack }) {
           <SchedulePanel projectId={projectId} />
         ) : activeTab === 'RESOURCES' ? (
           <ResourcePanel projectId={projectId} />
+        ) : activeTab === 'FINANCIALS' ? (
+          <FinancialsPanel projectId={projectId} />
         ) : activeModule ? (
           <>
             <p><strong>{activeModule.ValueLabel}</strong> hasn't been built yet.</p>
