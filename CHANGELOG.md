@@ -11,6 +11,62 @@ current chunk numbering.
 
 ---
 
+## v0.11.0 — WBS, Schedule & Delivery Planning (Chunk 05)
+
+**Added**
+- `ppm.WbsItems` (migration `009_wbs_schedule_delivery.sql`) —
+  self-referencing hierarchy per project (Module 12): reorder via
+  `move-up`/`move-down` (swaps `SequenceOrder` with the adjacent
+  sibling), `IsComplete` checkbox, `PathTypeValueId` for the green/
+  red/neutral decision-path marker. Archiving a parent recursively
+  archives its descendants (CTE) so nothing orphaned stays visible.
+- `ppm.ScheduleTasks` + `ppm.TaskDependencies` (Module 13) — tasks
+  with dates/percent-complete/status, dependency links between tasks
+  (Finish-to-Start/Start-to-Start/Finish-to-Finish/Start-to-Finish),
+  self-dependency and duplicate-link blocked at the DB level
+  (`CK_TaskDependencies_NotSelf`, `UQ_TaskDependencies`)
+- `ppm.Milestones` (Module 14) — including phase-gate milestones
+  optionally tied to a project's `cfg.LifecyclePhases` (Chunk 02),
+  with an Approve action (same free-text-approver pattern as
+  Charter — see D013)
+- `ppm.Deliverables` (Module 15) — owner, planned/actual date,
+  acceptance status, optional link to a Milestone
+- New Config Engine categories: `WbsPathType`, `TaskStatus`,
+  `DependencyType`, `MilestoneStatus`, `DeliverableAcceptanceStatus`
+- New `WorkspaceModules` value: `WBS` (its own tab). The existing
+  `SCHEDULE` tab (seeded migration 007) now hosts Tasks/Dependencies/
+  Milestones/Deliverables together as sub-tabs, matching how the
+  framework's own Chunk 05 scope groups Modules 13-15.
+- **Closes the Chunk 04 "template-to-project generation" gap**
+  (D014/migration 008 notes): `POST /api/ppm/wbs/{projectId}/generate-from-template`
+  reads the project's `TemplateId` and instantiates its active
+  Process Matrix items as top-level WBS items. Only runs on an empty
+  WBS — never silently duplicates (see D015).
+- `GET/POST/PUT/DELETE /api/ppm/wbs/{projectId}/{itemId?}/{action?}`
+  (+ `toggle`, `move-up`, `move-down`, `generate-from-template`)
+- `GET/POST/PUT/DELETE /api/ppm/schedule/tasks/{projectId}/{taskId?}/{sub?}/{subId?}`
+  (`sub` = `dependencies`)
+- `GET/POST/PUT/DELETE /api/ppm/milestones/{projectId}/{id?}` + `POST /{id}/approve`
+- `GET/POST/PUT/DELETE /api/ppm/deliverables/{projectId}/{id?}`
+- `src/pages/ProjectWorkspacePage.jsx` — WBS and Schedule tabs now
+  render real content (`WbsPanel`, `SchedulePanel`) instead of
+  placeholders; every other tab unchanged
+
+**Database**
+- Migration `009_wbs_schedule_delivery.sql` applied to DEV, then TEST
+
+**Deployed to:** DEV, TEST
+
+**Out of scope (documented, not a gap)**
+- Baseline Engine (Original/Approved/Forecast/Actual snapshots) — Chunk 06
+- RMG resource assignment to Schedule Tasks — Chunk 06
+- Gantt-style visual scheduling — the Schedule tab is list-based this round
+- Linking WBS items to Schedule Tasks — they remain two independent
+  structures; WBS is the breakdown checklist, Schedule is the
+  dated/dependency-tracked task list
+
+---
+
 ## v0.10.0 — Project Intake, Charter & Templates (Chunk 04)
 
 **Added**

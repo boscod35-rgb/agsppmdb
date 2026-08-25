@@ -119,9 +119,10 @@ run any SQL — each migration must still be applied to `PPM_DEV` and
 | 006 | `006_numbering_lifecycle_branding.sql` | DEV, TEST | `cfg.NumberingRules` + `cfg.Lifecycles`/`cfg.LifecyclePhases` + `cfg.BrandThemes` |
 | 007 | `007_portfolio_program_project.sql` | DEV, TEST | `ppm.Portfolios` + `ppm.Programs` + `ppm.Projects`; `PortfolioStatus`/`ProgramStatus`/`WorkspaceModules` config categories; Program numbering rule |
 | 008 | `008_intake_charter_templates.sql` | DEV, TEST | `ppm.ProjectTemplates` + `ppm.ProcessMatrixItems` + `ppm.ProjectIntakes` + `ppm.ProjectCharters`; `IntakeStatus`/`CharterApprovalStatus` config categories + `CHARTER` WorkspaceModules value; Intake numbering rule; `ppm.Projects.TemplateId` |
+| 009 | `009_wbs_schedule_delivery.sql` | DEV, TEST | `ppm.WbsItems` + `ppm.ScheduleTasks` + `ppm.TaskDependencies` + `ppm.Milestones` + `ppm.Deliverables`; `WbsPathType`/`TaskStatus`/`DependencyType`/`MilestoneStatus`/`DeliverableAcceptanceStatus` config categories + `WBS` WorkspaceModules value |
 
-**Next migration number: 009.**
-**Current version: v0.10.0. Next logical version: v0.11.0.**
+**Next migration number: 010.**
+**Current version: v0.11.0. Next logical version: v0.12.0.**
 
 ---
 
@@ -173,15 +174,14 @@ stated preference above.
 
 ## CHUNK 04 — Project Intake, Charter & Templates (Modules 08, 09, 10, 11)
 
-Done (v0.10.0, migration 008). Bundled together as one round per the
-stated preference above.
+Done (v0.10.0, migration 008). QA verified end-to-end on DEV + TEST.
+Bundled together as one round per the stated preference above.
 
 - [x] Template Management (Module 08) — `ppm.ProjectTemplates`,
       Create/Edit/Archive under Administration -> Global Templates
 - [x] Process Matrix (Module 11) — `ppm.ProcessMatrixItems`, ordered
-      checklist nested under each Template. **Config only** — does
-      not yet instantiate onto a real project (that's Module 12,
-      Chunk 05)
+      checklist nested under each Template. Instantiating onto a real
+      project's WBS shipped in Chunk 05 (Generate from Template action)
 - [x] Project Intake (Module 09) — `ppm.ProjectIntakes`,
       Create/Edit/Archive, plus a Convert to Project action that
       creates a real Project via the same Numbering pattern as
@@ -201,18 +201,29 @@ Templates (Modules 08–11, above), and WBS + Schedule is **Chunk 05**
 
 ## CHUNK 05 — WBS, Schedule & Delivery Planning (Modules 12, 13, 14, 15)
 
-Not started. Per the master scope document: WBS breakdown (add
-item, reorder/move up-down, completion checkbox, green/red path),
-schedule (phases, tasks, dates, dependencies), milestones/phase
-gates, deliverables. This is also where a Template's Process Matrix
-(built in Chunk 04) would first get instantiated onto a real
-project's WBS — worth deciding during scoping whether that's in this
-chunk or its own follow-on.
+Done (v0.11.0, migration 009). Bundled together as one round per the
+stated preference above.
 
-- [ ] WBS / Breakdown Checklist (Module 12)
-- [ ] Schedule Management (Module 13)
-- [ ] Milestone & Phase-Gate Tracking (Module 14)
-- [ ] Deliverables Management (Module 15)
+- [x] WBS / Breakdown Checklist (Module 12) — `ppm.WbsItems`,
+      self-referencing hierarchy per project with reorder (move
+      up/down), completion checkbox, green/red/neutral path marker,
+      own Workspace tab. Includes a Generate from Template action
+      that instantiates a project's Template's Process Matrix items
+      as real WBS items — closes the item deferred from Chunk 04.
+- [x] Schedule Management (Module 13) — `ppm.ScheduleTasks` +
+      `ppm.TaskDependencies` (FS/SS/FF/SF types), real content on
+      the Schedule tab's Tasks sub-tab
+- [x] Milestone & Phase-Gate Tracking (Module 14) — `ppm.Milestones`,
+      optional tie to a project's Lifecycle Phases for phase gates,
+      Approve action, Schedule tab's Milestones sub-tab
+- [x] Deliverables Management (Module 15) — `ppm.Deliverables`,
+      optional link to a Milestone, Schedule tab's Deliverables sub-tab
+
+**Note on tab structure:** Milestones and Deliverables were not given
+their own Workspace tabs — they live as sub-tabs inside the existing
+Schedule tab alongside Tasks, matching how the master scope document's
+own Chunk 05 text groups Modules 13–15 together. See `DECISIONS.md`
+D016.
 
 ## CHUNK 06 — Resource / RMG (Modules 16–20)
 
@@ -256,11 +267,14 @@ master document.
 
 ## Suggested next step
 
-**Chunk 05 — WBS, Schedule & Delivery Planning (Modules 12–15)** is
-next, per `ENTERPRISE_PPM_PROJECT_SCOPE (1).md` Section 7. WBS
-(Module 12) and Schedule (Module 13) are the natural pair to bundle
-first, since Milestone/Phase-Gate Tracking (14) and Deliverables (15)
-both attach to items created by those two. Worth deciding during
-scoping whether this round also instantiates a Template's Process
-Matrix (built in Chunk 04) onto a project's WBS, or whether that
-stays a separate follow-on.
+**Chunk 06 — Resource / RMG (Modules 16–20)** is next, per
+`ENTERPRISE_PPM_PROJECT_SCOPE (1).md` Section 7: Resource Master,
+Staffing & Allocation, Baseline vs Actual Resource Tracking, Capacity
+& Utilization, Skills/Competency Matrix. Resource Master (16) and
+Staffing & Allocation (17) are the natural pair to start with, since
+Baseline vs Actual (18) and Capacity & Utilization (19) both need
+real allocations to compare against or aggregate. Worth deciding
+during scoping whether this round also wires resource assignment
+onto the Schedule Tasks built in Chunk 05 (a task currently has no
+assigned resource), since that's the natural connective tissue
+between the two chunks.

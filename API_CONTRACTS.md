@@ -492,6 +492,88 @@ system exists yet.
 
 ---
 
+## GET/POST/PUT/DELETE /api/ppm/wbs/{projectId}/{itemId?}/{action?}
+
+Module 12, added in Chunk 05. GET `/{projectId}` returns a flat list
+of active WBS items for the project (the client nests them into a
+tree via `ParentWbsItemId`). POST `/{projectId}` creates an item —
+`itemName` required; `parentWbsItemId` (nullable — omit for top
+level), `pathTypeCode`, `notes` optional. New items land at the end
+of their parent's sibling list. PUT `/{projectId}/{itemId}` updates
+name/path-type/notes. DELETE `/{projectId}/{itemId}` archives the
+item **and all its descendants** (recursive).
+
+**Action sub-routes** (`{itemId}/{action}`):
+- `POST /{itemId}/toggle` — flips `IsComplete`
+- `POST /{itemId}/move-up` / `move-down` — swaps `SequenceOrder` with the adjacent sibling (transactional)
+
+**Special action** (no `itemId`): `POST /{projectId}/generate-from-template`
+— reads the project's `TemplateId` and instantiates its active
+Process Matrix items as top-level WBS items. Fails with
+`VALIDATION_FAILED` if the project has no Template, or already has
+WBS items (see `DECISIONS.md` D015 — never silently duplicates).
+
+**Failure:** `VALIDATION_FAILED` (400, missing `itemName`, or
+generate-from-template preconditions not met), `NOT_FOUND` (404,
+unknown project/item/parent-item or path-type code), `SCHEMA_MISSING`
+(500, run migration 009).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/schedule/tasks/{projectId}/{taskId?}/{sub?}/{subId?}
+
+Module 13, added in Chunk 05. GET `/{projectId}` lists active tasks,
+each with a nested `dependencies` array. POST `/{projectId}` creates
+a task — `taskName` required; `startDate`, `dueDate`,
+`percentComplete` (0–100), `statusCode` (defaults to `NOT_STARTED`),
+`notes` optional. PUT/DELETE `/{taskId}` update or archive.
+
+**Dependency sub-routes** (`sub` = `dependencies`):
+- `POST /{taskId}/dependencies` — body `{ dependsOnTaskId (required), dependencyTypeCode? }` (defaults to `FS`)
+- `DELETE /{taskId}/dependencies/{depId}` — removes the link
+
+**Failure:** `VALIDATION_FAILED` (400, missing `taskName` or
+`dependsOnTaskId`, or a task depending on itself), `NOT_FOUND` (404,
+unknown project/task/dependency or status/type code),
+`DUPLICATE_DEPENDENCY` (500, same link added twice), `SCHEMA_MISSING`
+(500, run migration 009).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/milestones/{projectId}/{id?}/{action?} + POST /{id}/approve
+
+Module 14, added in Chunk 05. GET `/{projectId}` lists milestones.
+POST `/{projectId}` creates — `milestoneName` required;
+`plannedDate`, `isPhaseGate`, `lifecyclePhaseId` (numeric — Lifecycle
+Phases aren't code-addressed, see `DB_SCHEMA.md`), `statusCode`
+(defaults to `PLANNED`), `notes` optional. PUT/DELETE `/{id}` update
+or archive.
+
+**POST `/{id}/approve`** — sets `StatusValueId = ACHIEVED`, stamps
+`ApprovedByName` (from `{ approvedByName }` in the body — free text,
+no auth system yet) and `ApprovedDate`, and backfills `ActualDate` if
+it wasn't already set.
+
+**Failure:** `VALIDATION_FAILED` (400, missing `milestoneName`),
+`NOT_FOUND` (404, unknown project/milestone/phase/status code),
+`SCHEMA_MISSING` (500, run migration 009).
+
+---
+
+## GET/POST/PUT/DELETE /api/ppm/deliverables/{projectId}/{id?}
+
+Module 15, added in Chunk 05. GET `/{projectId}` lists deliverables.
+POST `/{projectId}` creates — `deliverableName` required; `ownerName`,
+`plannedDate`, `milestoneId` (must belong to the same project),
+`acceptanceStatusCode` (defaults to `PENDING`), `notes` optional.
+PUT/DELETE `/{id}` update or archive.
+
+**Failure:** `VALIDATION_FAILED` (400, missing `deliverableName`),
+`NOT_FOUND` (404, unknown project/deliverable/milestone/status
+code), `SCHEMA_MISSING` (500, run migration 009).
+
+---
+
 ## Planned, not yet built
 
 - `GET /api/cmdb/azure-resources/{id}` — single record

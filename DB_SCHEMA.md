@@ -38,6 +38,7 @@ original file. (framework Section 92)
 | 006 | `006_numbering_lifecycle_branding.sql` | DEV, TEST | `cfg.NumberingRules` (Module 06) + `cfg.Lifecycles`/`cfg.LifecyclePhases` (Module 07) + `cfg.BrandThemes` (Section 106, data model only) |
 | 007 | `007_portfolio_program_project.sql` | DEV, TEST | `ppm.Portfolios` + `ppm.Programs` + `ppm.Projects` (Modules 02/03/04); `PortfolioStatus`/`ProgramStatus`/`WorkspaceModules` config categories; Program numbering rule |
 | 008 | `008_intake_charter_templates.sql` | DEV, TEST | `ppm.ProjectTemplates` + `ppm.ProcessMatrixItems` + `ppm.ProjectIntakes` + `ppm.ProjectCharters` (Modules 08/09/10/11); `IntakeStatus`/`CharterApprovalStatus` config categories + `CHARTER` WorkspaceModules value; Intake numbering rule; adds `ppm.Projects.TemplateId` |
+| 009 | `009_wbs_schedule_delivery.sql` | DEV, TEST | `ppm.WbsItems` + `ppm.ScheduleTasks` + `ppm.TaskDependencies` + `ppm.Milestones` + `ppm.Deliverables` (Modules 12/13/14/15); `WbsPathType`/`TaskStatus`/`DependencyType`/`MilestoneStatus`/`DeliverableAcceptanceStatus` config categories + `WBS` WorkspaceModules value |
 
 Every database independently tracks which migrations it has via its
 own `system.SchemaVersions` table — DEV and TEST each have their own
@@ -326,6 +327,83 @@ on the already-applied `ppm.Projects` table (migration 007 itself
 was not edited — this is a new migration adding to it, per
 `CLAUDE.md` rule 3). Purely a record of which template a project
 came from; does not drive any automatic checklist generation yet.
+
+## ppm.WbsItems
+
+Chunk 05, migration `009_wbs_schedule_delivery.sql`. Self-referencing
+hierarchy per project (Module 12).
+
+```sql
+ppm.WbsItems: WbsItemId PK, ProjectId FK -> ppm.Projects (required),
+  ParentWbsItemId FK -> ppm.WbsItems (nullable, self-ref - NULL = top level),
+  ItemName, SequenceOrder (reorder within siblings sharing the same parent),
+  IsComplete (checkbox), PathTypeValueId FK -> cfg.ConfigValues (category WbsPathType, nullable),
+  Notes, IsActive, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD via `/api/ppm/wbs/{projectId}/{itemId?}/{action?}`, plus
+`toggle` (flip `IsComplete`), `move-up`/`move-down` (swap
+`SequenceOrder` with the adjacent sibling, transactional), and
+`generate-from-template` (instantiates the project's Template's
+Process Matrix items as top-level WBS items — see D015; only runs on
+an empty WBS). Archiving an item recursively archives its
+descendants via a CTE, so nothing orphaned-looking stays visible.
+
+## ppm.ScheduleTasks / ppm.TaskDependencies
+
+Chunk 05, Module 13.
+
+```sql
+ppm.ScheduleTasks: ScheduleTaskId PK, ProjectId FK -> ppm.Projects (required),
+  TaskName, StartDate, DueDate, PercentComplete (0-100, CHECK constrained),
+  StatusValueId FK -> cfg.ConfigValues (category TaskStatus),
+  Notes, IsActive, CreatedDate/By, UpdatedDate/By
+
+ppm.TaskDependencies: TaskDependencyId PK,
+  TaskId FK -> ppm.ScheduleTasks (the dependent/successor task),
+  DependsOnTaskId FK -> ppm.ScheduleTasks (the predecessor task),
+  DependencyTypeValueId FK -> cfg.ConfigValues (category DependencyType: FS/SS/FF/SF),
+  CreatedDate/By.
+  CHECK(TaskId <> DependsOnTaskId) blocks self-dependency;
+  UNIQUE(TaskId, DependsOnTaskId) blocks duplicate links.
+```
+
+Full CRUD via `/api/ppm/schedule/tasks/{projectId}/{taskId?}/{sub?}/{subId?}`
+(`sub` = `dependencies`). No WBS-to-Schedule linkage yet — the two
+structures are independent this round.
+
+## ppm.Milestones
+
+Chunk 05, Module 14. Includes phase-gate milestones.
+
+```sql
+ppm.Milestones: MilestoneId PK, ProjectId FK -> ppm.Projects (required),
+  MilestoneName, PlannedDate, ActualDate, IsPhaseGate,
+  LifecyclePhaseId FK -> cfg.LifecyclePhases (nullable — ties a phase-gate
+  milestone back to the project's lifecycle phase structure from Chunk 02),
+  StatusValueId FK -> cfg.ConfigValues (category MilestoneStatus),
+  ApprovedByName, ApprovedDate (free text, no auth system yet — same
+  pattern as Charter, see D013), Notes, IsActive, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD via `/api/ppm/milestones/{projectId}/{id?}` + `POST
+/{id}/approve` (sets `StatusValueId = ACHIEVED`, stamps
+`ApprovedByName`/`ApprovedDate`, and backfills `ActualDate` if not
+already set).
+
+## ppm.Deliverables
+
+Chunk 05, Module 15.
+
+```sql
+ppm.Deliverables: DeliverableId PK, ProjectId FK -> ppm.Projects (required),
+  DeliverableName, OwnerName, PlannedDate, ActualDate,
+  MilestoneId FK -> ppm.Milestones (nullable, optional link),
+  AcceptanceStatusValueId FK -> cfg.ConfigValues (category DeliverableAcceptanceStatus),
+  Notes, IsActive, CreatedDate/By, UpdatedDate/By
+```
+
+Full CRUD via `/api/ppm/deliverables/{projectId}/{id?}`.
 
 ## Credentials reference (usernames and env var names ONLY — no
 ## passwords appear in this file or anywhere in the repo)

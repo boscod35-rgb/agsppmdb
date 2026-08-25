@@ -233,3 +233,39 @@ thing that request became. Keeping them as two independent rows
 linked only by `ProjectIntakes.ProjectId` (one-directional) avoids
 ambiguity about which record is authoritative for a field after
 conversion.
+
+---
+
+### D015 — WBS "Generate from Template" only runs on an empty WBS
+
+`POST /api/ppm/wbs/{projectId}/generate-from-template` (Chunk 05)
+closes the loop deferred in Chunk 04 (D014): it reads a project's
+`TemplateId` and instantiates the Template's Process Matrix items as
+real top-level `ppm.WbsItems`. To avoid silently duplicating items if
+someone clicks it twice, or generating on top of a WBS someone has
+already started building by hand, the endpoint refuses to run if the
+project already has any active WBS items - it returns a
+`VALIDATION_FAILED` error rather than merging or overwriting.
+
+**Status:** Deliberate. If a "regenerate" or "merge additional items"
+capability is ever needed, it should be a distinct, explicit action -
+not a side effect of calling this endpoint again.
+
+---
+
+### D016 — Milestones and Deliverables live on the Schedule tab, not their own tabs
+
+Modules 13 (Schedule), 14 (Milestones), and 15 (Deliverables) each
+have their own module number in the framework, but the framework's
+own Chunk 05 scope text groups them together ("schedule, milestones,
+phase gates, deliverables, dependencies between tasks" - Section 7).
+Rather than adding two more Workspace tabs, the existing `SCHEDULE`
+tab (seeded in migration 007) hosts all three as sub-tabs within one
+`SchedulePanel` component. WBS (Module 12) got its own tab instead,
+since a hierarchical checklist with reorder and green/red-path
+marking is a genuinely different UI paradigm from a dated task list.
+
+**Status:** Deliberate. If Milestones or Deliverables grow complex
+enough to need their own dedicated screen (e.g., a portfolio-wide
+milestone rollup), that would be a new WorkspaceModules value and a
+dedicated panel at that point, not a retrofit of this decision.
