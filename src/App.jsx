@@ -11,13 +11,18 @@ import PortfolioPage from './pages/PortfolioPage.jsx';
 import ProgramPage from './pages/ProgramPage.jsx';
 import ProjectsPage from './pages/ProjectsPage.jsx';
 import ProjectWorkspacePage from './pages/ProjectWorkspacePage.jsx';
+import TemplatesPage from './pages/TemplatesPage.jsx';
+import IntakePage from './pages/IntakePage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 // Top-level navigation, per Framework Section 87.
 // Portfolio / Programs / Projects flipped to built:true in Chunk 03.
+// Intake added in Chunk 04 (Module 09) - sits before Portfolio since
+// a request has no Portfolio yet until it's Converted to a Project.
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', built: true },
   { id: 'strategy', label: 'Strategy', built: false },
+  { id: 'intake', label: 'Intake', built: true },
   { id: 'portfolio', label: 'Portfolio', built: true },
   { id: 'programs', label: 'Programs', built: true },
   { id: 'projects', label: 'Projects', built: true },
@@ -39,7 +44,7 @@ const ADMIN_ITEMS = [
   { id: 'admin-lifecycle', label: 'Lifecycle / Stage-Gate', built: true },
   { id: 'admin-branding', label: 'Branding & Theme', built: true },
   { id: 'admin-rules', label: 'Rules', built: false },
-  { id: 'admin-templates', label: 'Global Templates', built: false },
+  { id: 'admin-templates', label: 'Global Templates', built: true }, // Chunk 04, Module 08
   { id: 'admin-modules', label: 'Modules', built: false },
   { id: 'admin-security', label: 'Security', built: false },
 ];
@@ -67,8 +72,10 @@ export default function App() {
       if (activeAdmin === 'admin-numbering') return <NumberingPage />;
       if (activeAdmin === 'admin-lifecycle') return <LifecyclePage />;
       if (activeAdmin === 'admin-branding') return <BrandingPage />;
+      if (activeAdmin === 'admin-templates') return <TemplatesPage />;
     }
 
+    if (activeNav === 'intake') return <IntakePage />;
     if (activeNav === 'portfolio') return <PortfolioPage />;
     if (activeNav === 'programs') return <ProgramPage />;
     if (activeNav === 'projects') {
