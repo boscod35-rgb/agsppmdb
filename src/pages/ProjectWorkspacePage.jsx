@@ -938,6 +938,210 @@ function RaidPanel({ projectId }) {
   );
 }
 
+function GapAssessmentPanel({ projectId }) {
+  const [subTab, setSubTab] = useState('gap');
+  const [pillars, setPillars] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [ratings, setRatings] = useState([]);
+  const [correctiveActions, setCorrectiveActions] = useState([]);
+  const [threeSixty, setThreeSixty] = useState([]);
+  const [threeSixtyRatings, setThreeSixtyRatings] = useState([]);
+  const [status, setStatus] = useState('loading');
+  const [errorDetail, setErrorDetail] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [expandedQuestionId, setExpandedQuestionId] = useState(null);
+  const [responseForm, setResponseForm] = useState({ ratingCode: '', findingText: '' });
+  const [showCapaFor, setShowCapaFor] = useState(null);
+  const [newCapa, setNewCapa] = useState({ title: '', ownerName: '', dueDate: '' });
+  const [newFeedback, setNewFeedback] = useState({ respondentName: '', respondentRole: '', overallRatingCode: '', feedback: '' });
+
+  useEffect(() => { load(); }, [projectId]);
+
+  async function load() {
+    setStatus('loading');
+    setErrorDetail('');
+    try {
+      const [gaRes, ratingRes, capaRes, tsRes, tsRatingRes] = await Promise.all([
+        fetch(`/api/ppm/gap-assessment/${projectId}`),
+        fetch('/api/config/values?category=GapAssessmentRating'),
+        fetch(`/api/ppm/corrective-actions/${projectId}`),
+        fetch(`/api/ppm/three-sixty/${projectId}`),
+        fetch('/api/config/values?category=ThreeSixtyRating'),
+      ]);
+      const gaData = await gaRes.json();
+      const capaData = await capaRes.json();
+      const tsData = await tsRes.json();
+      if (gaRes.ok && gaData.success) {
+        setPillars(gaData.pillars);
+        setSummary(gaData.summary);
+        setRatings((await ratingRes.json()).values || []);
+        setCorrectiveActions(capaData.success ? capaData.items : []);
+        setThreeSixty(tsData.success ? tsData.items : []);
+        setThreeSixtyRatings((await tsRatingRes.json()).values || []);
+        setStatus('ok');
+      } else {
+        setStatus('error'); setErrorDetail(gaData.detail || gaData.message || `HTTP ${gaRes.status}`);
+      }
+    } catch {
+      setStatus('error'); setErrorDetail('Could not reach the Gap Assessment APIs.');
+    }
+  }
+
+  function startAnswering(q) {
+    setExpandedQuestionId(q.QuestionId);
+    setResponseForm({ ratingCode: q.response?.RatingCode || '', findingText: q.response?.FindingText || '' });
+    setActionError('');
+  }
+
+  async function handleSaveResponse(questionId) {
+    setActionError('');
+    try {
+      const res = await fetch(`/api/ppm/gap-assessment/${projectId}/${questionId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(responseForm),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) { setExpandedQuestionId(null); load(); }
+      else setActionError(data.detail || data.message || 'Could not save response.');
+    } catch { setActionError('Could not reach the Gap Assessment API.'); }
+  }
+
+  async function handleAddCapa(responseId) {
+    if (!newCapa.title.trim()) return;
+    setActionError('');
+    try {
+      const res = await fetch(`/api/ppm/corrective-actions/${projectId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newCapa, gapAssessmentResponseId: responseId, dueDate: newCapa.dueDate || null }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) { setNewCapa({ title: '', ownerName: '', dueDate: '' }); setShowCapaFor(null); load(); }
+      else setActionError(data.detail || data.message || 'Could not add corrective action.');
+    } catch { setActionError('Could not reach the corrective actions API.'); }
+  }
+
+  async function handleCloseCapa(id) {
+    try {
+      const res = await fetch(`/api/ppm/corrective-actions/${projectId}/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusCode: 'CLOSED', closedDate: new Date().toISOString().slice(0, 10) }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) load();
+      else setActionError(data.detail || data.message || 'Could not close.');
+    } catch { setActionError('Could not reach the corrective actions API.'); }
+  }
+
+  async function handleAddFeedback() {
+    if (!newFeedback.feedback.trim()) return;
+    setActionError('');
+    try {
+      const res = await fetch(`/api/ppm/three-sixty/${projectId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newFeedback),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) { setNewFeedback({ respondentName: '', respondentRole: '', overallRatingCode: '', feedback: '' }); load(); }
+      else setActionError(data.detail || data.message || 'Could not add feedback.');
+    } catch { setActionError('Could not reach the 360 API.'); }
+  }
+
+  if (status === 'loading') return <p>Loading assessment&hellip;</p>;
+  if (status === 'error') return <div className="error-box"><strong>Could not load assessment.</strong><p>{errorDetail}</p></div>;
+
+  return (
+    <div>
+      {actionError && <div className="error-box"><strong>Action failed.</strong><p>{actionError}</p></div>}
+      <div className="filter-row" style={{ marginBottom: 12 }}>
+        <button onClick={() => setSubTab('gap')} style={{ fontWeight: subTab === 'gap' ? 700 : 400 }}>Gap Assessment</button>
+        <button onClick={() => setSubTab('360')} style={{ fontWeight: subTab === '360' ? 700 : 400 }}>360 Feedback</button>
+      </div>
+
+      {subTab === 'gap' && (
+        <div>
+          {summary && <p className="placeholder-detail">{summary.answeredQuestions} of {summary.totalQuestions} questions answered ({summary.percentComplete}%)</p>}
+          {pillars.map((p) => (
+            <div key={p.PillarId} style={{ marginBottom: 12 }}>
+              <strong>{p.PillarName}</strong>
+              {(p.subAreas || []).map((s) => (
+                <div key={s.SubAreaId} style={{ marginLeft: 16, marginTop: 4 }}>
+                  <em>{s.SubAreaName}</em>
+                  {(s.questions || []).map((q) => (
+                    <div key={q.QuestionId} style={{ marginLeft: 16, marginTop: 4, paddingBottom: 4, borderBottom: '1px solid #f0f0f0' }}>
+                      {q.QuestionText}{' '}
+                      {q.response?.RatingLabel && <span className={`status-pill status-${q.response.RatingCode === 'NON_COMPLIANT' ? 'deprecated' : q.response.RatingCode === 'COMPLIANT' ? 'active' : 'paused'}`}>{q.response.RatingLabel}</span>}{' '}
+                      <button onClick={() => startAnswering(q)}>{q.response ? 'Edit' : 'Answer'}</button>
+                      {q.response?.FindingText && (
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginTop: 2 }}>
+                          Finding: {q.response.FindingText}{' '}
+                          <button onClick={() => setShowCapaFor(showCapaFor === q.response.ResponseId ? null : q.response.ResponseId)}>+ Corrective Action</button>
+                        </div>
+                      )}
+                      {showCapaFor === q.response?.ResponseId && (
+                        <div style={{ marginTop: 4 }}>
+                          <input placeholder="CAPA title" value={newCapa.title} onChange={(e) => setNewCapa({ ...newCapa, title: e.target.value })} />{' '}
+                          <input placeholder="Owner" value={newCapa.ownerName} onChange={(e) => setNewCapa({ ...newCapa, ownerName: e.target.value })} />{' '}
+                          <input type="date" value={newCapa.dueDate} onChange={(e) => setNewCapa({ ...newCapa, dueDate: e.target.value })} />{' '}
+                          <button onClick={() => handleAddCapa(q.response.ResponseId)}>Add</button>
+                        </div>
+                      )}
+                      {expandedQuestionId === q.QuestionId && (
+                        <div style={{ marginTop: 4 }}>
+                          <select value={responseForm.ratingCode} onChange={(e) => setResponseForm({ ...responseForm, ratingCode: e.target.value })}>
+                            <option value="">Rating&hellip;</option>
+                            {ratings.map((r) => <option key={r.ConfigValueId} value={r.ValueCode}>{r.ValueLabel}</option>)}
+                          </select>{' '}
+                          <input style={{ width: 240 }} placeholder="Finding (if any)" value={responseForm.findingText} onChange={(e) => setResponseForm({ ...responseForm, findingText: e.target.value })} />{' '}
+                          <button onClick={() => handleSaveResponse(q.QuestionId)}>Save</button>{' '}
+                          <button onClick={() => setExpandedQuestionId(null)}>Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+          {pillars.length === 0 && <p className="placeholder-detail">No Gap Assessment framework configured yet — set one up under Administration -&gt; Gap Assessment Framework.</p>}
+
+          <div style={{ marginTop: 16 }}>
+            <strong>Corrective Actions</strong>
+            {correctiveActions.map((c) => (
+              <div key={c.CorrectiveActionId} style={{ padding: '4px 0' }}>
+                <code>{c.CorrectiveActionCode}</code> {c.Title} — {c.OwnerName || 'Unassigned'} — {c.StatusLabel || '\u2014'}
+                {c.StatusCode !== 'CLOSED' && <button style={{ marginLeft: 8 }} onClick={() => handleCloseCapa(c.CorrectiveActionId)}>Close</button>}
+              </div>
+            ))}
+            {correctiveActions.length === 0 && <p className="placeholder-detail">No corrective actions yet.</p>}
+          </div>
+        </div>
+      )}
+
+      {subTab === '360' && (
+        <div>
+          {threeSixty.map((t) => (
+            <div key={t.AssessmentId} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <strong>{t.RespondentName || 'Anonymous'}</strong> {t.RespondentRole ? `(${t.RespondentRole})` : ''}{' '}
+              {t.OverallRatingLabel && <span className="status-pill status-active">{t.OverallRatingLabel}</span>}
+              <p style={{ margin: '4px 0 0' }}>{t.Feedback}</p>
+            </div>
+          ))}
+          {threeSixty.length === 0 && <p className="placeholder-detail">No 360 feedback yet.</p>}
+
+          <div className="filter-row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
+            <input placeholder="Respondent name" value={newFeedback.respondentName} onChange={(e) => setNewFeedback({ ...newFeedback, respondentName: e.target.value })} />
+            <input placeholder="Role (e.g. Sponsor)" value={newFeedback.respondentRole} onChange={(e) => setNewFeedback({ ...newFeedback, respondentRole: e.target.value })} />
+            <select value={newFeedback.overallRatingCode} onChange={(e) => setNewFeedback({ ...newFeedback, overallRatingCode: e.target.value })}>
+              <option value="">Rating&hellip;</option>
+              {threeSixtyRatings.map((r) => <option key={r.ConfigValueId} value={r.ValueCode}>{r.ValueLabel}</option>)}
+            </select>
+            <input style={{ minWidth: 240 }} placeholder="Feedback" value={newFeedback.feedback} onChange={(e) => setNewFeedback({ ...newFeedback, feedback: e.target.value })} />
+            <button onClick={handleAddFeedback}>+ Add Feedback</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProjectWorkspacePage({ projectId, onBack }) {
   const [project, setProject] = useState(null);
   const [modules, setModules] = useState([]);
@@ -1022,7 +1226,7 @@ export default function ProjectWorkspacePage({ projectId, onBack }) {
         ))}
       </nav>
 
-      <div className={['CHARTER', 'WBS', 'SCHEDULE', 'RESOURCES', 'FINANCIALS', 'RAID'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
+      <div className={['CHARTER', 'WBS', 'SCHEDULE', 'RESOURCES', 'FINANCIALS', 'RAID', 'GAP_ASSESSMENT'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
         {activeTab === 'CHARTER' ? (
           <CharterPanel projectId={projectId} />
         ) : activeTab === 'WBS' ? (
@@ -1035,6 +1239,8 @@ export default function ProjectWorkspacePage({ projectId, onBack }) {
           <FinancialsPanel projectId={projectId} />
         ) : activeTab === 'RAID' ? (
           <RaidPanel projectId={projectId} />
+        ) : activeTab === 'GAP_ASSESSMENT' ? (
+          <GapAssessmentPanel projectId={projectId} />
         ) : activeModule ? (
           <>
             <p><strong>{activeModule.ValueLabel}</strong> hasn't been built yet.</p>
