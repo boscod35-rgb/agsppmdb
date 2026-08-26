@@ -13,6 +13,9 @@ export default function PortfolioPage() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [actionError, setActionError] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+  const [rollup, setRollup] = useState(null);
+  const [rollupStatus, setRollupStatus] = useState('idle');
 
   useEffect(() => { load(); }, []);
 
@@ -105,6 +108,18 @@ export default function PortfolioPage() {
     } catch { setActionError('Could not reach /api/ppm/portfolios.'); }
   }
 
+  async function toggleRollup(id) {
+    if (expandedId === id) { setExpandedId(null); setRollup(null); return; }
+    setExpandedId(id);
+    setRollupStatus('loading');
+    try {
+      const res = await fetch(`/api/ppm/raid-rollup/portfolio/${id}`);
+      const data = await res.json();
+      setRollup(res.ok && data.success ? data.rollup : null);
+      setRollupStatus('ok');
+    } catch { setRollup(null); setRollupStatus('error'); }
+  }
+
   return (
     <div className="page">
       <h1>Portfolio</h1>
@@ -120,7 +135,7 @@ export default function PortfolioPage() {
             <table className="cmdb-table">
               <thead>
                 <tr>
-                  <th>Code</th><th>Name</th><th>Business Unit</th><th>Owner</th><th>Status</th><th>Active</th><th></th>
+                  <th>Code</th><th>Name</th><th>Business Unit</th><th>Owner</th><th>Status</th><th>Active</th><th>RAID</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -142,6 +157,7 @@ export default function PortfolioPage() {
                       </select>
                     </td>
                     <td><span className={`status-pill status-${p.IsActive ? 'active' : 'deprecated'}`}>{p.IsActive ? 'Active' : 'Archived'}</span></td>
+                    <td>&mdash;</td>
                     <td>
                       <button onClick={() => handleSaveEdit(p.PortfolioId)}>Save</button>{' '}
                       <button onClick={() => setEditingId(null)}>Cancel</button>
@@ -155,9 +171,24 @@ export default function PortfolioPage() {
                     <td>{p.OwnerName || '\u2014'}</td>
                     <td>{p.StatusLabel ? <span className="status-pill status-active">{p.StatusLabel}</span> : '\u2014'}</td>
                     <td><span className={`status-pill status-${p.IsActive ? 'active' : 'deprecated'}`}>{p.IsActive ? 'Active' : 'Archived'}</span></td>
+                    <td><button onClick={() => toggleRollup(p.PortfolioId)}>{expandedId === p.PortfolioId ? 'Hide' : 'Rollup'}</button></td>
                     <td>
                       <button onClick={() => startEdit(p)}>Edit</button>{' '}
                       {p.IsActive ? <button onClick={() => handleArchive(p.PortfolioId, p.PortfolioName)}>Archive</button> : null}
+                    </td>
+                  </tr>
+                ))}
+                {portfolios.map((p) => expandedId === p.PortfolioId && (
+                  <tr key={`${p.PortfolioId}-rollup`}>
+                    <td colSpan={8} style={{ background: '#f8f9fb', padding: 16 }}>
+                      <strong>RAID Rollup — all projects under this portfolio</strong>
+                      {rollupStatus === 'loading' && <p className="placeholder-detail">Loading&hellip;</p>}
+                      {rollupStatus === 'error' && <p className="placeholder-detail">Could not load rollup.</p>}
+                      {rollupStatus === 'ok' && rollup && (
+                        <p style={{ margin: '8px 0 0' }}>
+                          Open: {rollup.totalOpen} &middot; Escalated: {rollup.totalEscalated} &middot; Closed: {rollup.totalClosed} &middot; Overdue: {rollup.totalOverdue}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))}
