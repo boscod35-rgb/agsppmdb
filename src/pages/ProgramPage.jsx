@@ -14,6 +14,9 @@ export default function ProgramPage() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [actionError, setActionError] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+  const [rollup, setRollup] = useState(null);
+  const [rollupStatus, setRollupStatus] = useState('idle');
 
   useEffect(() => { load(); }, [portfolioFilter]);
 
@@ -107,6 +110,18 @@ export default function ProgramPage() {
     } catch { setActionError('Could not reach /api/ppm/programs.'); }
   }
 
+  async function toggleRollup(id) {
+    if (expandedId === id) { setExpandedId(null); setRollup(null); return; }
+    setExpandedId(id);
+    setRollupStatus('loading');
+    try {
+      const res = await fetch(`/api/ppm/raid-rollup/program/${id}`);
+      const data = await res.json();
+      setRollup(res.ok && data.success ? data.rollup : null);
+      setRollupStatus('ok');
+    } catch { setRollup(null); setRollupStatus('error'); }
+  }
+
   return (
     <div className="page">
       <h1>Programs</h1>
@@ -129,7 +144,7 @@ export default function ProgramPage() {
             <table className="cmdb-table">
               <thead>
                 <tr>
-                  <th>Code</th><th>Name</th><th>Portfolio</th><th>Program Manager</th><th>Status</th><th>Active</th><th></th>
+                  <th>Code</th><th>Name</th><th>Portfolio</th><th>Program Manager</th><th>Status</th><th>Active</th><th>RAID</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -150,6 +165,7 @@ export default function ProgramPage() {
                       </select>
                     </td>
                     <td><span className={`status-pill status-${p.IsActive ? 'active' : 'deprecated'}`}>{p.IsActive ? 'Active' : 'Archived'}</span></td>
+                    <td>&mdash;</td>
                     <td>
                       <button onClick={() => handleSaveEdit(p.ProgramId)}>Save</button>{' '}
                       <button onClick={() => setEditingId(null)}>Cancel</button>
@@ -163,9 +179,24 @@ export default function ProgramPage() {
                     <td>{p.ProgramManagerName || '\u2014'}</td>
                     <td>{p.StatusLabel ? <span className="status-pill status-active">{p.StatusLabel}</span> : '\u2014'}</td>
                     <td><span className={`status-pill status-${p.IsActive ? 'active' : 'deprecated'}`}>{p.IsActive ? 'Active' : 'Archived'}</span></td>
+                    <td><button onClick={() => toggleRollup(p.ProgramId)}>{expandedId === p.ProgramId ? 'Hide' : 'Rollup'}</button></td>
                     <td>
                       <button onClick={() => startEdit(p)}>Edit</button>{' '}
                       {p.IsActive ? <button onClick={() => handleArchive(p.ProgramId, p.ProgramName)}>Archive</button> : null}
+                    </td>
+                  </tr>
+                ))}
+                {programs.map((p) => expandedId === p.ProgramId && (
+                  <tr key={`${p.ProgramId}-rollup`}>
+                    <td colSpan={8} style={{ background: '#f8f9fb', padding: 16 }}>
+                      <strong>RAID Rollup — all projects under this program</strong>
+                      {rollupStatus === 'loading' && <p className="placeholder-detail">Loading&hellip;</p>}
+                      {rollupStatus === 'error' && <p className="placeholder-detail">Could not load rollup.</p>}
+                      {rollupStatus === 'ok' && rollup && (
+                        <p style={{ margin: '8px 0 0' }}>
+                          Open: {rollup.totalOpen} &middot; Escalated: {rollup.totalEscalated} &middot; Closed: {rollup.totalClosed} &middot; Overdue: {rollup.totalOverdue}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))}

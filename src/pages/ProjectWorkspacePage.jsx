@@ -772,6 +772,172 @@ function FinancialsPanel({ projectId }) {
   );
 }
 
+function RaidPanel({ projectId }) {
+  const [items, setItems] = useState([]);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [lookups, setLookups] = useState({ types: [], statuses: [], severities: [], probabilities: [] });
+  const [status, setStatus] = useState('loading');
+  const [errorDetail, setErrorDetail] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ itemTypeCode: 'RISK', title: '', description: '', severityCode: '', probabilityCode: '', ownerName: '', raisedDate: '', dueDate: '' });
+
+  useEffect(() => { load(); }, [projectId, typeFilter]);
+
+  async function load() {
+    setStatus('loading');
+    setErrorDetail('');
+    try {
+      const qs = typeFilter ? `?type=${typeFilter}` : '';
+      const [iRes, typeRes, statusRes, sevRes, probRes] = await Promise.all([
+        fetch(`/api/ppm/raid/${projectId}${qs}`),
+        fetch('/api/config/values?category=RaidItemType'),
+        fetch('/api/config/values?category=RaidStatus'),
+        fetch('/api/config/values?category=RaidSeverity'),
+        fetch('/api/config/values?category=RaidProbability'),
+      ]);
+      const iData = await iRes.json();
+      if (iRes.ok && iData.success) {
+        setItems(iData.items);
+        setLookups({
+          types: (await typeRes.json()).values || [],
+          statuses: (await statusRes.json()).values || [],
+          severities: (await sevRes.json()).values || [],
+          probabilities: (await probRes.json()).values || [],
+        });
+        setStatus('ok');
+      } else {
+        setStatus('error'); setErrorDetail(iData.detail || iData.message || `HTTP ${iRes.status}`);
+      }
+    } catch {
+      setStatus('error'); setErrorDetail(`Could not reach /api/ppm/raid/${projectId}.`);
+    }
+  }
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    setActionError('');
+    try {
+      const payload = { ...form };
+      Object.keys(payload).forEach((k) => { if (payload[k] === '') payload[k] = null; });
+      payload.itemTypeCode = form.itemTypeCode;
+      const res = await fetch(`/api/ppm/raid/${projectId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setForm({ itemTypeCode: 'RISK', title: '', description: '', severityCode: '', probabilityCode: '', ownerName: '', raisedDate: '', dueDate: '' });
+        setShowAdd(false); load();
+      } else setActionError(data.detail || data.message || 'Could not add RAID item.');
+    } catch { setActionError('Could not reach the RAID API.'); }
+  }
+
+  async function handleEscalate(id) {
+    const escalatedToName = window.prompt('Escalate to whom?');
+    if (escalatedToName === null) return;
+    try {
+      const res = await fetch(`/api/ppm/raid/${projectId}/${id}/escalate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ escalatedToName }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) load();
+      else setActionError(data.detail || data.message || 'Could not escalate.');
+    } catch { setActionError('Could not reach the RAID API.'); }
+  }
+
+  async function handleClose(id) {
+    try {
+      const res = await fetch(`/api/ppm/raid/${projectId}/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusCode: 'CLOSED', closedDate: new Date().toISOString().slice(0, 10) }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) load();
+      else setActionError(data.detail || data.message || 'Could not close.');
+    } catch { setActionError('Could not reach the RAID API.'); }
+  }
+
+  async function handleArchive(id) {
+    try {
+      const res = await fetch(`/api/ppm/raid/${projectId}/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data.success) load();
+      else setActionError(data.detail || data.message || 'Could not archive.');
+    } catch { setActionError('Could not reach the RAID API.'); }
+  }
+
+  if (status === 'loading') return <p>Loading RAID log&hellip;</p>;
+  if (status === 'error') return <div className="error-box"><strong>Could not load RAID log.</strong><p>{errorDetail}</p></div>;
+
+  return (
+    <div>
+      {actionError && <div className="error-box"><strong>Action failed.</strong><p>{actionError}</p></div>}
+      <div className="filter-row" style={{ marginBottom: 12 }}>
+        {['', 'RISK', 'ISSUE', 'DEPENDENCY', 'ASSUMPTION', 'ACTION'].map((t) => (
+          <button key={t || 'all'} onClick={() => setTypeFilter(t)} style={{ fontWeight: typeFilter === t ? 700 : 400 }}>
+            {t ? lookups.types.find((lt) => lt.ValueCode === t)?.ValueLabel || t : 'All'}
+          </button>
+        ))}
+      </div>
+
+      {items.map((i) => (
+        <div key={i.RaidItemId} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+          <code>{i.RaidItemCode}</code> <strong>{i.Title}</strong> — {i.ItemTypeLabel}{' '}
+          {i.SeverityLabel && <span className={`status-pill status-${i.SeverityCode === 'CRITICAL' || i.SeverityCode === 'HIGH' ? 'deprecated' : 'paused'}`}>{i.SeverityLabel}</span>}{' '}
+          — {i.StatusLabel || '\u2014'} — {i.OwnerName || 'Unassigned'} — Age: {i.AgeDays}d
+          {i.IsEscalated && <span className="status-pill status-deprecated" style={{ marginLeft: 4 }}>Escalated{i.EscalatedToName ? ` to ${i.EscalatedToName}` : ''}</span>}
+          <div style={{ marginTop: 2 }}>
+            {i.StatusCode !== 'CLOSED' && <button onClick={() => handleClose(i.RaidItemId)}>Close</button>}{' '}
+            {i.StatusCode !== 'ESCALATED' && i.StatusCode !== 'CLOSED' && <button onClick={() => handleEscalate(i.RaidItemId)}>Escalate</button>}{' '}
+            <button onClick={() => handleArchive(i.RaidItemId)}>Archive</button>
+          </div>
+        </div>
+      ))}
+      {items.length === 0 && <p className="placeholder-detail">No RAID items{typeFilter ? ` of type ${typeFilter}` : ''} yet.</p>}
+
+      {!showAdd ? (
+        <button style={{ marginTop: 16 }} onClick={() => setShowAdd(true)}>+ Add RAID Item</button>
+      ) : (
+        <form className="detail-panel" style={{ marginTop: 16, maxWidth: 480 }} onSubmit={handleAdd}>
+          <div className="detail-header"><h3>Add RAID Item</h3><button type="button" onClick={() => setShowAdd(false)}>Cancel</button></div>
+          <dl>
+            <dt>Type</dt>
+            <dd>
+              <select value={form.itemTypeCode} onChange={(e) => setForm({ ...form, itemTypeCode: e.target.value })}>
+                {lookups.types.map((t) => <option key={t.ConfigValueId} value={t.ValueCode}>{t.ValueLabel}</option>)}
+              </select>
+            </dd>
+            <dt>Title</dt><dd><input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></dd>
+            <dt>Description</dt><dd><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></dd>
+            <dt>Severity</dt>
+            <dd>
+              <select value={form.severityCode} onChange={(e) => setForm({ ...form, severityCode: e.target.value })}>
+                <option value="">&mdash;</option>
+                {lookups.severities.map((s) => <option key={s.ConfigValueId} value={s.ValueCode}>{s.ValueLabel}</option>)}
+              </select>
+            </dd>
+            {form.itemTypeCode === 'RISK' && (
+              <>
+                <dt>Probability</dt>
+                <dd>
+                  <select value={form.probabilityCode} onChange={(e) => setForm({ ...form, probabilityCode: e.target.value })}>
+                    <option value="">&mdash;</option>
+                    {lookups.probabilities.map((p) => <option key={p.ConfigValueId} value={p.ValueCode}>{p.ValueLabel}</option>)}
+                  </select>
+                </dd>
+              </>
+            )}
+            <dt>Owner</dt><dd><input value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} /></dd>
+            <dt>Raised Date</dt><dd><input type="date" value={form.raisedDate} onChange={(e) => setForm({ ...form, raisedDate: e.target.value })} /></dd>
+            <dt>Due Date</dt><dd><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></dd>
+          </dl>
+          <button type="submit" style={{ marginTop: 12 }}>Save</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export default function ProjectWorkspacePage({ projectId, onBack }) {
   const [project, setProject] = useState(null);
   const [modules, setModules] = useState([]);
@@ -856,7 +1022,7 @@ export default function ProjectWorkspacePage({ projectId, onBack }) {
         ))}
       </nav>
 
-      <div className={['CHARTER', 'WBS', 'SCHEDULE', 'RESOURCES', 'FINANCIALS'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
+      <div className={['CHARTER', 'WBS', 'SCHEDULE', 'RESOURCES', 'FINANCIALS', 'RAID'].includes(activeTab) ? 'detail-panel' : 'placeholder-box'} style={{ marginTop: 0 }}>
         {activeTab === 'CHARTER' ? (
           <CharterPanel projectId={projectId} />
         ) : activeTab === 'WBS' ? (
@@ -867,6 +1033,8 @@ export default function ProjectWorkspacePage({ projectId, onBack }) {
           <ResourcePanel projectId={projectId} />
         ) : activeTab === 'FINANCIALS' ? (
           <FinancialsPanel projectId={projectId} />
+        ) : activeTab === 'RAID' ? (
+          <RaidPanel projectId={projectId} />
         ) : activeModule ? (
           <>
             <p><strong>{activeModule.ValueLabel}</strong> hasn't been built yet.</p>
