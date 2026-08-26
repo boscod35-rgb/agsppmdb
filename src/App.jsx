@@ -15,6 +15,7 @@ import TemplatesPage from './pages/TemplatesPage.jsx';
 import IntakePage from './pages/IntakePage.jsx';
 import ResourcesPage from './pages/ResourcesPage.jsx';
 import RateCardsPage from './pages/RateCardsPage.jsx';
+import GapAssessmentFrameworkPage from './pages/GapAssessmentFrameworkPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 // Top-level navigation, per Framework Section 87.
@@ -45,6 +46,7 @@ const ADMIN_ITEMS = [
   { id: 'admin-numbering', label: 'Numbering', built: true },
   { id: 'admin-lifecycle', label: 'Lifecycle / Stage-Gate', built: true },
   { id: 'admin-branding', label: 'Branding & Theme', built: true },
+  { id: 'admin-gap-framework', label: 'Gap Assessment Framework', built: true }, // Chunk 09, Module 32
   { id: 'admin-rules', label: 'Rules', built: false },
   { id: 'admin-templates', label: 'Global Templates', built: true }, // Chunk 04, Module 08
   { id: 'admin-modules', label: 'Modules', built: false },
@@ -74,6 +76,7 @@ export default function App() {
       if (activeAdmin === 'admin-numbering') return <NumberingPage />;
       if (activeAdmin === 'admin-lifecycle') return <LifecyclePage />;
       if (activeAdmin === 'admin-branding') return <BrandingPage />;
+      if (activeAdmin === 'admin-gap-framework') return <GapAssessmentFrameworkPage />;
       if (activeAdmin === 'admin-templates') return <TemplatesPage />;
     }
 
